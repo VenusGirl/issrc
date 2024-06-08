@@ -9,7 +9,7 @@
 
   <xsl:comment>
     Inno Setup Preprocessor Reference
-    Copyright (C) 1997-2020 Jordan Russell
+    Copyright (C) 1997-2024 Jordan Russell
     Portions Copyright (C) 2000-2020 Martijn Laan
     For conditions of distribution and use, see LICENSE.TXT.
     Portions Copyright (C) 2001-2004 Alex Yackimoff
@@ -63,11 +63,23 @@
     <xsl:if test="topic">
       <heading><xsl:value-of select="subtopicstitle"/></heading>
       <ul>
-        <xsl:for-each select="topic">
-          <xsl:if test="title">
-          <li><link topic="{translate(@id,$ucletters,$lcletters)}"><xsl:value-of select="title"/></link></li>
-          </xsl:if>
-        </xsl:for-each>
+        <xsl:choose>
+          <xsl:when test="@id='funcs'">
+            <xsl:for-each select="topic">
+              <xsl:sort select="title" data-type="text" order="ascending"/>
+              <xsl:if test="title">
+                <li><link topic="{translate(@id,$ucletters,$lcletters)}"><xsl:value-of select="title"/></link></li>
+              </xsl:if>
+            </xsl:for-each>
+          </xsl:when>
+          <xsl:otherwise>
+            <xsl:for-each select="topic">
+              <xsl:if test="title">
+                <li><link topic="{translate(@id,$ucletters,$lcletters)}"><xsl:value-of select="title"/></link></li>
+              </xsl:if>
+            </xsl:for-each>
+          </xsl:otherwise>
+        </xsl:choose>
       </ul>
     </xsl:if>
   </body>
@@ -118,7 +130,7 @@
   <xsl:apply-templates/>
 </xsl:template>
 
-<xsl:template match="para">
+<xsl:template match="p">
   <p><xsl:apply-templates/></p>
 </xsl:template>
 
@@ -130,7 +142,7 @@
   <li><xsl:apply-templates/></li>
 </xsl:template>
 
-<xsl:template match="synel">
+<xsl:template match="tt">
   <tt><xsl:apply-templates/></tt>
 </xsl:template>
 

@@ -3,32 +3,37 @@ program ISCC;
 
 {
   Inno Setup
-  Copyright (C) 1997-2023 Jordan Russell
+  Copyright (C) 1997-2024 Jordan Russell
   Portions by Martijn Laan
   For conditions of distribution and use, see LICENSE.TXT.
 
   Command-line compiler
 }
 
-{$SetPEFlags 1} 
-{$SETPEOSVERSION 6.0}
-{$SETPESUBSYSVERSION 6.0}
-{$WEAKLINKRTTI ON}
-
 {x$DEFINE STATICCOMPILER}
 { For debugging purposes, remove the 'x' to have it link the compiler code
   into this program and not depend on ISCmplr.dll. }
 
 uses
-  SafeDLLPath in 'SafeDLLPath.pas',
-  Windows, SysUtils, Classes,
-  {$IFDEF STATICCOMPILER} Compile, {$ENDIF}
-  PathFunc, CmnFunc2, CompInt, FileClass, CompTypes;
+  SafeDLLPath in 'Src\SafeDLLPath.pas',
+  Windows,
+  SysUtils,
+  Classes,
+  {$IFDEF STATICCOMPILER} Compile in 'Src\Compile.pas', {$ENDIF}
+  PathFunc in '..\Components\PathFunc.pas',
+  CmnFunc2 in 'Src\CmnFunc2.pas',
+  CompInt in 'Src\CompInt.pas',
+  FileClass in 'Src\FileClass.pas',
+  CompTypes in 'Src\CompTypes.pas',
+  Int64Em in 'Src\Int64Em.pas';
 
-{$R *.res}
-{$R ISCC.manifest.res}
+{$SetPEFlags IMAGE_FILE_RELOCS_STRIPPED}
+{$SETPEOSVERSION 6.1}
+{$SETPESUBSYSVERSION 6.1}
+{$WEAKLINKRTTI ON}
 
-{$I VERSION.INC}
+{$R Res\ISCC.manifest.res}
+{$R Res\ISCC.versionandicon.res}
 
 type
   PScriptLine = ^TScriptLine;
@@ -52,6 +57,7 @@ type
 
 var
   StdOutHandle, StdErrHandle: THandle;
+  StdOutHandleIsConsole, StdErrHandleIsConsole: Boolean;
   ScriptFilename: String;
   Definitions, IncludePath, IncludeFiles, Output, OutputPath, OutputFilename: String;
   SignTools: TStringList;
@@ -64,12 +70,19 @@ var
   IsppOptions: TIsppOptions;
   IsppMode: Boolean;
 
-procedure WriteToStdHandle(const H: THandle; S: AnsiString);
-var
-  BytesWritten: DWORD;
+procedure WriteToStdHandle(const Handle: THandle; const HandleIsConsole: Boolean; S: String);
 begin
-  if Copy(S, 1, 1) <> #13 then S := S + #13#10;
-  WriteFile(H, S[1], Length(S), BytesWritten, nil);
+  if Copy(S, 1, 1) <> #13 then
+    S := S + #13#10;
+
+  if HandleIsConsole then begin
+    var CharsWritten: DWORD;
+    WriteConsole(Handle, @S[1], Length(S), CharsWritten, nil);
+  end else begin
+    var Utf8S := Utf8Encode(S);
+    var BytesWritten: DWORD;
+    WriteFile(Handle, Utf8S[1], Length(Utf8S), BytesWritten, nil);
+  end;
 end;
 
 procedure WriteStdOut(const S: String; const Warning: Boolean = False);
@@ -77,10 +90,10 @@ var
   CSBI: TConsoleScreenBufferInfo;
   DidSetColor: Boolean;
 begin
-  DidSetColor := Warning and GetConsoleScreenBufferInfo(StdOutHandle, CSBI) and
+  DidSetColor := Warning and StdOutHandleIsConsole and GetConsoleScreenBufferInfo(StdOutHandle, CSBI) and
                  SetConsoleTextAttribute(StdOutHandle, FOREGROUND_INTENSITY or FOREGROUND_RED or FOREGROUND_GREEN);
   try
-    WriteToStdHandle(StdOutHandle, AnsiString(S));
+    WriteToStdHandle(StdOutHandle, StdOutHandleIsConsole, S);
   finally
     if DidSetColor then
       SetConsoleTextAttribute(StdOutHandle, CSBI.wAttributes);
@@ -92,10 +105,10 @@ var
   CSBI: TConsoleScreenBufferInfo;
   DidSetColor: Boolean;
 begin
-  DidSetColor := Error and GetConsoleScreenBufferInfo(StdErrHandle, CSBI) and
+  DidSetColor := Error and StdErrHandleIsConsole and GetConsoleScreenBufferInfo(StdErrHandle, CSBI) and
                  SetConsoleTextAttribute(StdErrHandle, FOREGROUND_INTENSITY or FOREGROUND_RED);
   try
-    WriteToStdHandle(StdErrHandle, AnsiString(S));
+    WriteToStdHandle(StdErrHandle, StdErrHandleIsConsole, S);
   finally
     if DidSetColor then
       SetConsoleTextAttribute(StdErrHandle, CSBI.wAttributes);
@@ -106,7 +119,7 @@ function GetCursorPos: TPoint;
 var
   CSBI: TConsoleScreenBufferInfo;
 begin
-  if not GetConsoleScreenBufferInfo(StdOutHandle, CSBI) then
+  if not StdOutHandleIsConsole or not GetConsoleScreenBufferInfo(StdOutHandle, CSBI) then
     Exit;
   Result.X := CSBI.dwCursorPosition.X;
   Result.Y := CSBI.dwCursorPosition.Y;
@@ -117,7 +130,7 @@ var
   Coords: TCoord;
   CSBI: TConsoleScreenBufferInfo;
 begin
-  if not GetConsoleScreenBufferInfo(StdOutHandle, CSBI) then
+  if not StdOutHandleIsConsole or not GetConsoleScreenBufferInfo(StdOutHandle, CSBI) then
     Exit;
   if P.X < 0 then Exit;
   if P.Y < 0 then Exit;
@@ -133,17 +146,15 @@ var
   CSBI: TConsoleScreenBufferInfo;
   Str: String;
 begin
-  if GetConsoleScreenBufferInfo(StdOutHandle, CSBI) then
-  begin
+  if StdOutHandleIsConsole and GetConsoleScreenBufferInfo(StdOutHandle, CSBI) then begin
     if Length(S) > CSBI.dwSize.X then
       Str := Copy(S, 1, CSBI.dwSize.X)
     else
       Str := Format('%-' + IntToStr(CSBI.dwSize.X) + 's', [S]);
-  end
-  else
+  end else
     Str := S;
 
-  WriteToStdHandle(StdOutHandle, AnsiString(Str));
+  WriteToStdHandle(StdOutHandle, StdOutHandleIsConsole, Str);
 end;
 
 function ConsoleCtrlHandler(dwCtrlType: DWORD): BOOL; stdcall;
@@ -367,8 +378,8 @@ procedure ProcessCommandLine;
   procedure ShowBanner;
   begin
     WriteStdOut('Inno Setup 6 Command-Line Compiler');
-    WriteStdOut('Copyright (C) 1997-2023 Jordan Russell. All rights reserved.');
-    WriteStdOut('Portions Copyright (C) 2000-2023 Martijn Laan. All rights reserved.');
+    WriteStdOut('Copyright (C) 1997-2024 Jordan Russell. All rights reserved.');
+    WriteStdOut('Portions Copyright (C) 2000-2024 Martijn Laan. All rights reserved.');
     if IsppMode then
       WriteStdOut('Portions Copyright (C) 2001-2004 Alex Yackimoff. All rights reserved.');
     WriteStdOut('https://www.innosetup.com');
@@ -632,6 +643,9 @@ begin
   try
     StdOutHandle := GetStdHandle(STD_OUTPUT_HANDLE);
     StdErrHandle := GetStdHandle(STD_ERROR_HANDLE);
+    var Mode: DWORD;
+    StdOutHandleIsConsole := GetConsoleMode(StdOutHandle, Mode);
+    StdErrHandleIsConsole := GetConsoleMode(StdErrHandle, Mode);
     SetConsoleCtrlHandler(@ConsoleCtrlHandler, True);
     try
       IsppMode := FileExists(ExtractFilePath(NewParamStr(0)) + 'ispp.dll');

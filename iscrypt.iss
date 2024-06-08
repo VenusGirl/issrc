@@ -50,8 +50,8 @@ begin
 
   BitmapImage := TBitmapImage.Create(Page);
   with BitmapImage do begin
-    Width := ScaleX(32);
-    Height := ScaleY(32);
+    Width := ScaleX(34);
+    Height := ScaleY(34);
     Parent := Page.Surface;
   end;
   
@@ -66,19 +66,20 @@ begin
     WordWrap := True;
     Caption := ALabel1Caption;
     Parent := Page.Surface;
+    AdjustHeight;
   end;
-  WizardForm.AdjustLabelHeight(Label1);
 
   Label2 := TNewStaticText.Create(Page);
   with Label2 do begin
+    AutoSize := False;
     Top := Label1.Top + Label1.Height + ScaleY(12);
     Width := Page.SurfaceWidth;
     Anchors := [akLeft, akTop, akRight];
     WordWrap := True;
     Caption := ALabel2Caption;
     Parent := Page.Surface;
+    AdjustHeight;
   end;
-  WizardForm.AdjustLabelHeight(Label2);
   
   CreateCustomOption(Page, ACheckCaption, CheckBox, Label2);
 

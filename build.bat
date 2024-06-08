@@ -1,7 +1,7 @@
 @echo off
 
 rem  Inno Setup
-rem  Copyright (C) 1997-2019 Jordan Russell
+rem  Copyright (C) 1997-2024 Jordan Russell
 rem  Portions by Martijn Laan
 rem  For conditions of distribution and use, see LICENSE.TXT.
 rem
@@ -20,15 +20,15 @@ rem  Once done the installer can be found in Output
 
 setlocal
 
-set VER=6.2.2
+set VER=6.3.0
 
 echo Building Inno Setup %VER%...
 echo.
 
 cd /d %~dp0
 
-if "%1%"=="setup" goto setup
-if not "%1%"=="" goto failed
+if "%1"=="setup" goto setup
+if not "%1"=="" goto failed
 
 cd ishelp\ishelpgen
 if errorlevel 1 goto failed
@@ -78,6 +78,7 @@ if errorlevel 1 goto failed
 cd ..
 if errorlevel 1 goto failed
 echo Creating Inno Setup installer done
+powershell.exe -Command "Write-Host -NoNewline 'SHA256 hash: '; (Get-FileHash -Algorithm SHA256 -Path output\innosetup-%VER%.exe).Hash.ToLower()"
 
 echo All done!
 pause

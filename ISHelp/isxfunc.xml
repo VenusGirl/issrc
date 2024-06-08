@@ -321,7 +321,7 @@ end;</pre></example>
         <name>ShowExceptionMessage</name>
         <prototype>procedure ShowExceptionMessage;</prototype>
         <description><p>Shows the message associated with the current exception in a message box. This function should only be called from within an <tt>except</tt> section, or a function called from an <tt>except</tt> section.</p></description>
-        <remarks><p>If logging is enabled (via the <link topic="setupcmdline">/LOG</link> command line parameter or the <link topic="setup_setuplogging">SetupLogging</link> [Setup] section directive) the message will be recorded in the log in addition to being shown.</p></remarks>
+        <remarks><p>If logging is enabled (via the <link topic="setupcmdline">/LOG</link> command line parameter or the <link topic="setup_setuplogging">SetupLogging</link> [Setup] section directive or the <link topic="setup_uninstalllogging">UninstallLogging</link> [Setup] section directive or debugging from the Compiler IDE) the message will be recorded in the log file and/or in the Compiler IDE's "Debug Output" view in addition to being shown.</p></remarks>
         <example><pre>var
   I: Integer;
 begin
@@ -439,6 +439,7 @@ end;</pre></example>
         <name>IsWin64</name>
         <prototype>function IsWin64: Boolean;</prototype>
         <description><p>Returns True if the system is running a 64-bit version of Windows. If False is returned, you cannot utilize any of Inno Setup's 64-bit-only features.</p>
+<p>Another way to describe this function is: Returns True if the system matches architecture identifier <link topic="archidentifiers">win64</link>.</p>
 <p>Do not use this function to detect <link topic="32vs64bitinstalls">64-bit install mode</link>, use <link topic="isxfunc_Is64BitInstallMode">Is64BitInstallMode</link> instead.</p></description>
         <example><pre>begin
   // Check IsWin64 before using a 64-bit-only feature to
@@ -469,90 +470,69 @@ end;</pre></example>
       <function>
         <name>ProcessorArchitecture</name>
         <prototype>function ProcessorArchitecture: TSetupProcessorArchitecture;</prototype>
-        <description><p>Returns the native processor architecture of the current system.</p>
-<p>TSetupProcessorArchitecture is defined as:</p>
-<p><tt>TSetupProcessorArchitecture = (paUnknown, paX86, paX64, paIA64, paARM64);</tt></p></description>
-        <remarks><p>A 64-bit processor architecture will never be returned on 32-bit versions of Windows. Hence, you cannot use this function to detect a 64-bit AMD CPU on a 32-bit version of Windows; you'll just get back <tt>paX86</tt> if you try.</p>
-<p><tt>paUnknown</tt> is returned if Setup/Uninstall does not recognize the processor architecture. It can be assumed that an "unknown" architecture is at least capable of executing 32-bit code, or Setup/Uninstall wouldn't be running at all.</p>
-<p>If <tt>paIA64</tt> is returned, and <tt>ia64</tt> is <i>not</i> included in the value of the <link topic="setup_architecturesinstallin64bitmode">ArchitecturesInstallIn64BitMode</link> [Setup] section directive, you should not assume that Inno Setup's 64-bit-only features are available -- for example, the <tt>{autopf64}</tt> constant. Those features only work when <link topic="isxfunc_IsWin64">IsWin64</link> returns True, and as documented, it may not return True on older Itanium versions of Windows that lack certain APIs Inno Setup requires.</p>
-<p>Therefore, instead of:</p>
-<pre>
-  if ProcessorArchitecture = paIA64 then
-    // perform some Itanium-specific install task that
-    // involves expanding {autopf64}
-</pre>
-<p>you should additionally check that IsWin64 returns True:</p>
-<pre>
-  if ProcessorArchitecture = paIA64 then
-  begin
-    if IsWin64 then
-      // perform some Itanium-specific install task that
-      // involves expanding {autopf64}
-    else
-      // cannot use 64-bit features; display an error message,
-      // fail silently, try something else, etc.
-  end;
-</pre>
-<p>If <tt>ia64</tt> <i>is</i> included in the value of the <link topic="setup_architecturesinstallin64bitmode">ArchitecturesInstallIn64BitMode</link> [Setup] section directive, then it is not necessary to check IsWin64 because Setup will do so itself at startup, and fail with an error message (<tt>MissingWOW64APIs</tt>) if it is False.</p></remarks>
+        <description><p>Returns the architecture of the system's Windows installation.</p>
+<p><tt>TSetupProcessorArchitecture</tt> is an enumerated type, defined as:</p>
+<p><tt>TSetupProcessorArchitecture = (paUnknown, paX86, paX64, paArm32, paArm64);</tt></p></description>
+        <remarks><p><tt>paUnknown</tt> is returned if Setup/Uninstall does not recognize the architecture of the Windows installation. It can be assumed that an "unknown" architecture is at least capable of executing 32-bit x86 code, or Setup/Uninstall wouldn't be running at all.</p>
+<p><tt>paArm32</tt> is not a possible return value for this function because no version of Windows for 32-bit Arm processors had the ability to run x86 binaries. (An x86 emulator was first introduced in Arm64 Windows.)</p></remarks>
         <example><pre>var
   S: String;
 begin
   case ProcessorArchitecture of
     paX86: S := 'x86';
     paX64: S := 'x64';
-    paIA64: S := 'Itanium';
-    paARM64: S := 'ARM64';
+    paArm64: S := 'Arm64';
   else
     S := 'Unrecognized';
   end;
-  MsgBox('Your processor architecture: ' + S, mbInformation, MB_OK);
+  MsgBox('Windows architecture: ' + S, mbInformation, MB_OK);
 end;</pre></example>
-        <seealso><p><link topic="isxfunc_IsX86">IsX86</link><br />
-<link topic="isxfunc_IsX64">IsX64</link><br />
-<link topic="isxfunc_IsIA64">IsIA64</link><br />
-<link topic="isxfunc_IsARM64">IsARM64</link><br />
-<link topic="isxfunc_IsWin64">IsWin64</link><br />
+        <seealso><p><link topic="isarchidentifier">Architecture Identifier Matchers like IsX64Compatible</link><br />
 <link topic="isxfunc_Is64BitInstallMode">Is64BitInstallMode</link></p></seealso>
       </function>
       <function>
-        <name>IsX86</name>
-        <prototype>function IsX86: Boolean;</prototype>
-        <description><p>Returns True if the native processor architecture is x86.</p>
-<p>This function is a shorthand for <link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link>. Be sure to read the <link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link> topic before using this function.</p></description>
-        <seealso><p><link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link><br />
-<link topic="isxfunc_IsX64">IsX64</link><br />
-<link topic="isxfunc_IsIA64">IsIA64</link><br />
-<link topic="isxfunc_IsARM64">IsARM64</link></p></seealso>
+        <name>IsArm32Compatible</name>
+        <prototype>function IsArm32Compatible: Boolean;</prototype>
+        <description><p>Returns True if the system matches architecture identifier <link topic="archidentifiers">arm32compatible</link>.</p></description>
+        <seealso><p><link topic="isarchidentifier">Architecture Identifier Matchers like IsX64Compatible</link><br />
+<link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link></p></seealso>
       </function>
       <function>
-        <name>IsX64</name>
-        <prototype>function IsX64: Boolean;</prototype>
-        <description><p>Returns True if the native processor architecture is x64.</p>
-<p>This function is a shorthand for <link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link>. Be sure to read the <link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link> topic before using this function.</p></description>
-        <seealso><p><link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link><br />
-<link topic="isxfunc_IsX86">IsX86</link><br />
-<link topic="isxfunc_IsIA64">IsIA64</link><br />
-<link topic="isxfunc_IsARM64">IsARM64</link></p></seealso>
+        <name>IsArm64</name>
+        <prototype>function IsArm64: Boolean;</prototype>
+        <description><p>Returns True if the system matches architecture identifier <link topic="archidentifiers">arm64</link>.</p></description>
+        <seealso><p><link topic="isarchidentifier">Architecture Identifier Matchers like IsX64Compatible</link><br />
+<link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link></p></seealso>
       </function>
       <function>
-        <name>IsIA64</name>
-        <prototype>function IsIA64: Boolean;</prototype>
-        <description><p>Returns True if the native processor architecture is ia64.</p>
-<p>This function is a shorthand for <link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link>. Be sure to read the <link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link> topic before using this function.</p></description>
-        <seealso><p><link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link><br />
-<link topic="isxfunc_IsX86">IsX86</link><br />
-<link topic="isxfunc_IsX64">IsX64</link><br />
-<link topic="isxfunc_IsARM64">IsARM64</link></p></seealso>
+        <name>IsX64Compatible</name>
+        <prototype>function IsX64Compatible: Boolean;</prototype>
+        <description><p>Returns True if the system matches architecture identifier <link topic="archidentifiers">x64compatible</link>.</p></description>
+        <seealso><p><link topic="isarchidentifier">Architecture Identifier Matchers like IsX64Compatible</link><br />
+<link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link></p></seealso>
       </function>
       <function>
-        <name>IsARM64</name>
-        <prototype>function IsARM64: Boolean;</prototype>
-        <description><p>Returns True if the native processor architecture is arm64.</p>
-<p>This function is a shorthand for <link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link>. Be sure to read the <link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link> topic before using this function.</p></description>
-        <seealso><p><link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link><br />
-<link topic="isxfunc_IsX86">IsX86</link><br />
-<link topic="isxfunc_IsX64">IsX64</link><br />
-<link topic="isxfunc_IsIA64">IsIA64</link></p></seealso>
+        <name>IsX64OS</name>
+        <prototype>function IsX64OS: Boolean;</prototype>
+        <description><p>Returns True if the system matches architecture identifier <link topic="archidentifiers">x64os</link>.</p>
+<p>Before Inno Setup 6.3, <tt>IsX64OS</tt> was named <tt>IsX64</tt>. The compiler still accepts <tt>IsX64</tt> as an alias for <tt>IsX64OS</tt>, but will emit a deprecation warning when used.</p></description>
+        <seealso><p><link topic="isarchidentifier">Architecture Identifier Matchers like IsX64Compatible</link><br />
+<link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link></p></seealso>
+      </function>
+      <function>
+        <name>IsX86Compatible</name>
+        <prototype>function IsX86Compatible: Boolean;</prototype>
+        <description><p>Returns True if the system matches architecture identifier <link topic="archidentifiers">x86compatible</link>.</p></description>
+        <seealso><p><link topic="isarchidentifier">Architecture Identifier Matchers like IsX64Compatible</link><br />
+<link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link></p></seealso>
+      </function>
+      <function>
+        <name>IsX86OS</name>
+        <prototype>function IsX86OS: Boolean;</prototype>
+        <description><p>Returns True if the system matches architecture identifier <link topic="archidentifiers">x86os</link>.</p>
+<p>Before Inno Setup 6.3, <tt>IsX86OS</tt> was named <tt>IsX86</tt>. The compiler still accepts <tt>IsX86</tt> as an alias for <tt>IsX86OS</tt>.</p></description>
+        <seealso><p><link topic="isarchidentifier">Architecture Identifier Matchers like IsX64Compatible</link><br />
+<link topic="isxfunc_ProcessorArchitecture">ProcessorArchitecture</link></p></seealso>
       </function>
     </subcategory>
     <subcategory>
@@ -1160,6 +1140,16 @@ GetDateTimeString('dd/mm/yyyy hh:nn:ss', '-', ':');
         <prototype>procedure OemToCharBuff(var S: AnsiString);</prototype>
         <description><p>Translates a string with characters from the OEM-defined character set into an ANSI string.</p></description>
       </function>
+      <function>
+        <name>Utf8Encode</name>
+        <prototype>function Utf8Encode(const S: String): AnsiString;</prototype>
+        <description><p>Encodes a Unicode string into a UTF-8 encoded ANSI string.</p></description>
+      </function>
+      <function>
+        <name>Utf8Decode</name>
+        <prototype>function Utf8Decode(const S: AnsiString): String;</prototype>
+        <description><p>Decodes a UTF-8 encoded ANSI string into a Unicode string.</p></description>
+      </function>
     </subcategory>
     <subcategory>
       <function>
@@ -1620,7 +1610,7 @@ begin
     // directory is launched.
     OldState := EnableFsRedirection(False);
     try
-      Exec(ExpandConstant('{cmd}'), '', '', SW_SHOW,
+      Exec(ExpandConstant('{cmd}'), '', '', SW_SHOWNORMAL,
         ewWaitUntilTerminated, ResultCode);
     finally
       // Restore the previous redirection state.
@@ -1646,12 +1636,13 @@ end;</pre></example>
 <p>Do not include quotes in the Filename parameter; the function will add them automatically.</p>
 <p>The WorkingDir parameter can be an empty string, in which case it will try to extract a pathname from the Filename parameter and use that as the initial current directory for the process. If no pathname was specified in Filename, a default directory will be used.</p>
 <p>If you have a single string containing both a filename and parameters (e.g. a command line obtained from an UninstallString registry value), you need not separate them yourself; just pass <tt>'>'</tt> in the Filename parameter, and the full command line in the Params parameter. (Note that when this is done, the function's special platform-independent support for .bat and .cmd files is disabled; it simply passes the specified command line to CreateProcess without any processing.)</p>
-<p>By default, when Setup/Uninstall is running in <link topic="32vs64bitinstalls">64-bit install mode</link>, this function disables WOW64 file system redirection when calling CreateProcess. It is possible to override this by calling <link topic="isxfunc_EnableFsRedirection">EnableFsRedirection</link>.</p></remarks>
+<p>By default, when Setup/Uninstall is running in <link topic="32vs64bitinstalls">64-bit install mode</link>, this function disables WOW64 file system redirection when calling CreateProcess. It is possible to override this by calling <link topic="isxfunc_EnableFsRedirection">EnableFsRedirection</link>.</p>
+<p><i>Note: compared to ISPP's Exec the ShowCmd and Wait parameters are swapped!</i></p></remarks>
         <example><pre>var
   ResultCode: Integer;
 begin
   // Launch Notepad and wait for it to terminate
-  if Exec(ExpandConstant('{win}\notepad.exe'), '', '', SW_SHOW,
+  if Exec(ExpandConstant('{win}\notepad.exe'), '', '', SW_SHOWNORMAL,
      ewWaitUntilTerminated, ResultCode) then
   begin
     // handle success if necessary; ResultCode contains the exit code
@@ -1660,7 +1651,8 @@ begin
     // handle failure if necessary; ResultCode contains the error code
   end;
 end;</pre></example>
-        <seealso><p><link topic="isxfunc_ExecAsOriginalUser">ExecAsOriginalUser</link></p></seealso>
+        <seealso><p><link topic="isxfunc_ExecAndLogOutput">ExecAndLogOutput</link><br />
+<link topic="isxfunc_ExecAsOriginalUser">ExecAsOriginalUser</link></p></seealso>
       </function>
       <function>
         <name>ExecAsOriginalUser</name>
@@ -1681,7 +1673,7 @@ end;</pre></example>
   ErrorCode: Integer;
 begin
   if not ShellExec('', ExpandConstant('{app}\filename.rtf'),
-     '', '', SW_SHOW, ewNoWait, ErrorCode) then
+     '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode) then
   begin
     // handle failure if necessary
   end;
@@ -1793,8 +1785,8 @@ end;
 function InitializeSetup: Boolean;
 begin
   try
-    DownloadTemporaryFile('https://jrsoftware.org/download.php/is.exe', 'innosetup-latest.exe', '', @OnDownloadProgress);
-    DownloadTemporaryFile('https://jrsoftware.org/download.php/iscrypt.dll', 'ISCrypt.dll', '2f6294f9aa09f59a574b5dcd33be54e16b39377984f3d5658cda44950fa0f8fc', @OnDownloadProgress);
+    DownloadTemporaryFile('https://jrsoftware.org/download.php/is.exe?dontcount=1', 'innosetup-latest.exe', '', @OnDownloadProgress);
+    DownloadTemporaryFile('https://jrsoftware.org/download.php/iscrypt.dll?dontcount=1', 'ISCrypt.dll', '2f6294f9aa09f59a574b5dcd33be54e16b39377984f3d5658cda44950fa0f8fc', @OnDownloadProgress);
     Result := True;
   except
     Log(GetExceptionMessage);
@@ -1857,11 +1849,27 @@ end;</pre>
         <name>LoadStringFromFile</name>
         <prototype>function LoadStringFromFile(const FileName: String; var S: AnsiString): Boolean;</prototype>
         <description><p>Loads the specified binary or non Unicode text file into the specified string. Returns True if successful, False otherwise.</p></description>
+        <remarks><p>Use <link topic="isxfunc_LoadStringFromLockedFile">LoadStringFromLockedFile</link> to load even if the file is already opened for writing by another program.</p></remarks>
+        <seealso><p><link topic="isxfunc_LoadStringsFromFile">LoadStringsFromFile</link></p></seealso>
+      </function>
+      <function>
+        <name>LoadStringFromLockedFile</name>
+        <prototype>function LoadStringFromLockedFile(const FileName: String; var S: AnsiString): Boolean;</prototype>
+        <description><p>Loads the specified binary or non Unicode text file into the specified string, even if the file is already opened for writing by another program. Returns True if successful, False otherwise.</p></description>
+        <seealso><p><link topic="isxfunc_LoadStringFromFile">LoadStringFromFile</link></p></seealso>
       </function>
       <function>
         <name>LoadStringsFromFile</name>
         <prototype>function LoadStringsFromFile(const FileName: String; var S: TArrayOfString): Boolean;</prototype>
-        <description><p>Loads the specified text file into the specified string array. Returns True if successful, False otherwise.</p></description>
+        <description><p>Loads the specified text file into the specified string array. UTF-8 encoded files with or without a BOM are also supported. Returns True if successful, False otherwise.</p></description>
+        <remarks><p>Use <link topic="isxfunc_LoadStringsFromLockedFile">LoadStringsFromLockedFile</link> to load even if the file is already opened for writing by another program.</p></remarks>
+        <seealso><p><link topic="isxfunc_LoadStringFromFile">LoadStringFromFile</link></p></seealso>
+      </function>
+      <function>
+        <name>LoadStringsFromLockedFile</name>
+        <prototype>function LoadStringsFromLockedFile(const FileName: String; var S: TArrayOfString): Boolean;</prototype>
+        <description><p>Loads the specified text file into the specified string array, even if the file is already opened for writing by another program. UTF-8 encoded files with or without a BOM are also supported. Returns True if successful, False otherwise.</p></description>
+        <seealso><p><link topic="isxfunc_LoadStringsFromFile">LoadStringsFromFile</link></p></seealso>
       </function>
       <function>
         <name>SaveStringToFile</name>
@@ -1874,13 +1882,22 @@ end;</pre>
         <name>SaveStringsToFile</name>
         <prototype>function SaveStringsToFile(const FileName: String; const S: TArrayOfString; const Append: Boolean): Boolean;</prototype>
         <description><p>Saves the specified string array to the specified file with ASCII encoding. If Append is True and the specified file already exists, it will be appended to instead of overwritten. Returns True if successful, False otherwise.</p></description>
-        <seealso><p><link topic="isxfunc_SaveStringsToUTF8File">SaveStringsToUTF8File</link></p></seealso>
+        <seealso><p><link topic="isxfunc_SaveStringsToUTF8File">SaveStringsToUTF8File</link><br />
+<link topic="isxfunc_SaveStringsToUTF8FileWithoutBOM">SaveStringsToUTF8FileWithoutBOM</link></p></seealso>
       </function>
       <function>
         <name>SaveStringsToUTF8File</name>
         <prototype>function SaveStringsToUTF8File(const FileName: String; const S: TArrayOfString; const Append: Boolean): Boolean;</prototype>
-        <description><p>Saves the specified string array to the specified file with UTF8 encoding. If Append is True and the specified file already exists, it will be appended to instead of overwritten. Returns True if successful, False otherwise.</p></description>
-        <seealso><p><link topic="isxfunc_SaveStringsToFile">SaveStringsToFile</link></p></seealso>
+        <description><p>Saves the specified string array to the specified file with UTF-8 encoding with a BOM. If Append is True and the specified file already exists, it will be appended to instead of overwritten. Returns True if successful, False otherwise.</p></description>
+        <seealso><p><link topic="isxfunc_SaveStringsToFile">SaveStringsToFile</link><br />
+<link topic="isxfunc_SaveStringsToUTF8FileWithoutBOM">SaveStringsToUTF8FileWithoutBOM</link></p></seealso>
+      </function>
+      <function>
+        <name>SaveStringsToUTF8FileWithoutBOM</name>
+        <prototype>function SaveStringsToUTF8FileWithoutBOM(const FileName: String; const S: TArrayOfString; const Append: Boolean): Boolean;</prototype>
+        <description><p>Saves the specified string array to the specified file with UTF-8 encoding without a BOM. If Append is True and the specified file already exists, it will be appended to instead of overwritten. Returns True if successful, False otherwise.</p></description>
+        <seealso><p><link topic="isxfunc_SaveStringsToFile">SaveStringsToFile</link><br />
+<link topic="isxfunc_SaveStringsToUTF8File">SaveStringsToUTF8File</link></p></seealso>
       </function>
     </subcategory>
     <subcategory>
@@ -2530,7 +2547,7 @@ Page := CreateOutputMsgMemoPage(wpWelcome,
 <p>Always put the <tt>Hide</tt> call inside the <tt>finally</tt> part of a <tt>try..finally</tt> language construct, as demonstrated in <i>CodeDlg.iss</i>. Not calling <tt>Hide</tt> will result in the wizard being permanently stuck on the progress page.</p>
 <p>To set the text on the page, call the <tt>SetText</tt> method. <tt>SetText</tt> takes two string parameters: use the first to tell the user what you're doing, and the second to display a file or directory name. Either parameter may be blank.</p>
 <p>To show or update the progress bar, call the <tt>SetProgress</tt> method. <tt>SetProgress</tt> takes two integer parameters: the first specifies the position of the progress bar (zero-based), and the second specifies the highest possible position. If the second parameter is 0, the progress bar will be hidden.</p></remarks>
-        <example><p>See <i>CodeDlg.iss</i> and <i>AllPagesExample.iss</i> for examples.</p></example>
+        <example><p>See <i>CodeDlg.iss</i> and <i>AllPagesExample.iss</i> example scrips in the "Examples" subdirectory in your Inno Setup directory for examples.</p></example>
         <seealso><p><link topic="scriptclasses" anchor="TOutputProgressWizardPage">TOutputProgressWizardPage</link><br />
 <link topic="isxfunc_CreateOutputMarqueeProgressPage">CreateOutputMarqueeProgressPage</link></p></seealso>
       </function>
@@ -2553,6 +2570,7 @@ Page := CreateOutputMsgMemoPage(wpWelcome,
 <p>Always put the <tt>Hide</tt> call inside the <tt>finally</tt> part of a <tt>try..finally</tt> language construct, as demonstrated in <i>CodeDownloadFiles.iss</i>. Not calling <tt>Hide</tt> will result in the wizard being permanently stuck on the progress page.</p>
 <p>To add a new file to download, call the <tt>Add</tt> method. Always call the <tt>Clear</tt> method before adding the first file.</p>
 <p>To start the download, call the <tt>Download</tt> method. An exception will be raised if there was an error. Otherwise, <tt>Download</tt> returns the number of bytes downloaded.</p>
+<p>Set the <tt>ShowBaseNameInsteadOfUrl</tt> property to <tt>True</tt> to show the base name of the file which is being downloaded to the user instead of the URL.</p>
 <p>See <link topic="isxfunc_DownloadTemporaryFile">DownloadTemporaryFile</link> for other considerations and the definition of <tt>TOnDownloadProgress</tt>.</p></remarks>
         <example><p>See <i>CodeDownloadFiles.iss</i> for an example.</p></example>
         <seealso><p><link topic="scriptclasses" anchor="TDownloadWizardPage">TDownloadWizardPage</link><br />
@@ -2563,7 +2581,7 @@ Page := CreateOutputMsgMemoPage(wpWelcome,
         <name>CreateCustomPage</name>
         <prototype>function CreateCustomPage(const AfterID: Integer; const ACaption, ADescription: String): TWizardPage;</prototype>
         <description><p>Creates a custom wizard page. The page is empty by default; you have to create your own controls afterward and place them on the page (by setting their Parent properties to the Surface property of the <link topic="scriptclasses" anchor="TWizardPage">TWizardPage</link> instance returned by this function).</p></description>
-        <example><p>See <i>CodeDlg.iss</i> and <i>AllPagesExample.iss</i> for examples.</p></example>
+        <example><p>See <i>CodeClasses.iss</i> and <i>AllPagesExample.iss</i> example scripts in the "Examples" subdirectory in your Inno Setup directory for examples.</p></example>
         <seealso><p><link topic="scriptclasses" anchor="TWizardPage">TWizardPage</link></p></seealso>
       </function>
     </subcategory>
@@ -2847,8 +2865,38 @@ end;</pre></example>
       <function>
         <name>Log</name>
         <prototype>procedure Log(const S: String);</prototype>
-        <description><p>Logs the specified string in Setup's log file.</p></description>
-        <remarks><p>Calls to this function are ignored if logging is not enabled via the <link topic="setupcmdline">/LOG</link> command line parameter or the <link topic="setup_setuplogging">SetupLogging</link> [Setup] section directive.</p></remarks>
+        <description><p>Logs the specified string in Setup's or Uninstall's log file and/or in the Compiler IDE's "Debug Output" view.</p></description>
+        <remarks><p>Calls to this function are ignored if logging is not enabled (via the <link topic="setupcmdline">/LOG</link> command line parameter or the <link topic="setup_setuplogging">SetupLogging</link> [Setup] section directive or the <link topic="setup_uninstalllogging">UninstallLogging</link> [Setup] section directive or debugging from the Compiler IDE).</p></remarks>
+      </function>
+      <function>
+        <name>ExecAndLogOutput</name>
+        <prototype>function ExecAndLogOutput(const Filename, Params, WorkingDir: String; const ShowCmd: Integer; const Wait: TExecWait; var ResultCode: Integer; const OnLog: TOnLog): Boolean;</prototype>
+        <description><p>Identical to <link topic="isxfunc_Exec">Exec</link> except:</p>
+<p>Console programs are always hidden and the ShowCmd parameter only affects GUI programs, so always using <tt>SW_SHOWNORMAL</tt> instead of <tt>SW_HIDE</tt> is recommended.</p>
+<p>If OnLog is set to <tt>nil</tt> then the output of the executed executable or batch file is logged in Setup's or Uninstall's log file and/or in the Compiler IDE's "Debug Output" view.</p>
+<p>If OnLog is not set to <tt>nil</tt> then the output is sent to the specified function, line by line.</p></description>
+        <remarks><p>Parameter <tt>Wait</tt> must always be set to <tt>ewWaitUntilTerminated</tt> when calling this function.</p>
+<p>TOnLog is defined as:</p>
+<p><tt>TOnLog = procedure(const S: String; const Error, FirstLine: Boolean);</tt></p></remarks>
+        <example><pre>var
+  Line: String;
+
+procedure ExecAndGetFirstLineLog(const S: String; const Error, FirstLine: Boolean);
+begin
+  if not Error and (Line = '') and (Trim(S) &lt;&gt; '') then
+    Line := S; { First non-empty line found, store it }
+  if FirstLine then
+    Log('Output:');
+  Log(S);
+end;
+
+function ExecAndGetFirstLine(const Filename, Params, WorkingDir: String; var ResultCode: Integer): String;
+begin
+  Line := '';
+  ExecAndLogOutput(Filename, Params, WorkingDir, SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode, @ExecAndGetFirstLineLog);
+  Result := Line;
+end;</pre></example>
+        <seealso><p><link topic="isxfunc_Exec">Exec</link></p></seealso>
       </function>
     </subcategory>
   </category>
@@ -2958,10 +3006,6 @@ end;</pre></example>
   <enum>
      <description>Reg* - RootKey values (also see the <link topic="registrysection" window="main">[Registry]</link> section documentation)</description>
      <values>HKEY_AUTO, HKEY_AUTO_32, HKEY_AUTO_64,<br />HKEY_CLASSES_ROOT, HKEY_CLASSES_ROOT_32, HKEY_CLASSES_ROOT_64,<br />HKEY_CURRENT_USER, HKEY_CURRENT_USER_32, HKEY_CURRENT_USER_64,<br />HKEY_LOCAL_MACHINE, HKEY_LOCAL_MACHINE_32, HKEY_LOCAL_MACHINE_64,<br />HKEY_USERS, HKEY_USERS_32, HKEY_USERS_64,<br />HKEY_PERFORMANCE_DATA,<br />HKEY_CURRENT_CONFIG, HKEY_CURRENT_CONFIG_32, HKEY_CURRENT_CONFIG_64,<br />HKEY_DYN_DATA,<br />HKA, HKA32, HKA64, HKCR, HKCR32, HKCR64, HKCU, HKCU32, HKCU64, HKLM, HKLM32, HKLM64, HKU, HKU32, HKU64, HKCC, HKCC32, HKCC64</values>
-  </enum>
-  <enum>
-     <description>TShellFolderID</description>
-     <values>sfDesktop, sfStartMenu, sfPrograms, sfStartup, sfSendTo, sfFonts, sfAppData, sfDocs, sfTemplates, sfFavorites, sfLocalAppData</values>
   </enum>
   <enum>
      <description>TSetupMessageID</description>

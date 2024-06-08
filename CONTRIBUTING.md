@@ -1,8 +1,8 @@
 Inno Setup
 ==========
 
-Copyright (C) 1997-2023 Jordan Russell. All rights reserved.  
-Portions Copyright (C) 2000-2023 Martijn Laan. All rights reserved.  
+Copyright (C) 1997-2024 Jordan Russell. All rights reserved.  
+Portions Copyright (C) 2000-2024 Martijn Laan. All rights reserved.  
 For conditions of distribution and use, see LICENSE.TXT.
 
 Contributing issues
@@ -58,4 +58,4 @@ To contribute translations please see https://jrsoftware.org/files/istrans/send.
 
 Please do NOT use GitHub's web editor to edit ANSI translations and create pull
 requests. This editor doesn't work since it automatically turns ANSI files into
-UTF8 files without a BOM which are not supported (only UTF8 with a BOM is).
+UTF8 files without a BOM which are not supported before Inno Setup 6.3.

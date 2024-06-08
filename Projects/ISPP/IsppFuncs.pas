@@ -3,7 +3,7 @@
   Copyright (C) 2001-2002 Alex Yackimoff
 
   Inno Setup
-  Copyright (C) 1997-2020 Jordan Russell
+  Copyright (C) 1997-2024 Jordan Russell
   Portions by Martijn Laan
   For conditions of distribution and use, see LICENSE.TXT.
 }
@@ -11,8 +11,6 @@
 unit IsppFuncs;
 
 interface
-
-{$I ..\Version.inc}
 
 uses
   Windows, Classes, IsppVarUtils, IsppIntf, IsppPreprocessor, IsppParser;
@@ -22,17 +20,15 @@ procedure RegisterFunctions(Preproc: TPreprocessor);
 implementation
 
 uses
-  SysUtils, IniFiles, Registry, IsppConsts, IsppBase, IsppIdentMan,
+  SysUtils, IniFiles, Registry, Math, IsppConsts, IsppBase, IsppIdentMan,
   IsppSessions, DateUtils, FileClass, MD5, SHA1, PathFunc, CmnFunc2, Int64Em;
   
 var
   IsWin64: Boolean;
 
 function PrependPath(const Ext: Longint; const Filename: String): String;
-var
-  Preprocessor: TPreprocessor;
 begin
-  Preprocessor := TObject(Ext) as TPreprocessor;
+  var Preprocessor := TObject(Ext) as TPreprocessor;
   Result := PathExpand(Preprocessor.PrependDirName(Filename,
     Preprocessor.SourcePath));
 end;
@@ -634,18 +630,36 @@ begin
   end;
 end;
 
-function InstExec(const Filename, Params: String; WorkingDir: String;
-  const WaitUntilTerminated, WaitUntilIdle: Boolean; const ShowCmd: Integer;
-  const ProcessMessagesProc: TProcedure; var ErrorCode: Cardinal): Boolean;
+function Exec(const Filename, Params: String; WorkingDir: String;
+  const WaitUntilTerminated: Boolean; const ShowCmd: Integer;
+  const Preprocessor: TPreprocessor; const Log: Boolean; const LogProc: TLogProc;
+  const LogProcData: NativeInt; var ResultCode: Integer): Boolean;
 var
   CmdLine: String;
   WorkingDirP: PChar;
   StartupInfo: TStartupInfo;
   ProcessInfo: TProcessInformation;
 begin
-  Result := True;
-  CmdLine := Filename + ' ' + Params;
-  if WorkingDir = '' then WorkingDir := ExtractFilePath(Filename);
+  {This function is a combination of InstFuncs' InstExec and Compile's InternalSignCommand }
+
+  if Filename = '>' then
+    CmdLine := Params
+  else begin
+    if (Filename = '') or (Filename[1] <> '"') then
+      CmdLine := '"' + Filename + '"'
+    else
+      CmdLine := Filename;
+    if Params <> '' then
+      CmdLine := CmdLine + ' ' + Params;
+    if SameText(PathExtractExt(Filename), '.bat') or
+       SameText(PathExtractExt(Filename), '.cmd') then begin
+      { See InstExec for explanation }
+      CmdLine := '"' + AddBackslash(GetSystemDir) + 'cmd.exe" /C "' + CmdLine + '"'
+    end;
+    if WorkingDir = '' then
+      WorkingDir := PathExtractDir(Filename);
+  end;
+
   FillChar (StartupInfo, SizeOf(StartupInfo), 0);
   StartupInfo.cb := SizeOf(StartupInfo);
   StartupInfo.dwFlags := STARTF_USESHOWWINDOW;
@@ -654,70 +668,146 @@ begin
     WorkingDirP := PChar(WorkingDir)
   else
     WorkingDirP := nil;
-  if not CreateProcess(nil, PChar(CmdLine), nil, nil, False, 0, nil,
-     WorkingDirP, StartupInfo, ProcessInfo) then begin
-    Result := False;
-    ErrorCode := GetLastError;
-    Exit;
-  end;
-  with ProcessInfo do begin
+    
+  var OutputReader: TCreateProcessOutputReader := nil;
+  try
+    var InheritHandles := False;
+    var dwCreationFlags: DWORD := CREATE_DEFAULT_ERROR_MODE;
+
+    if Log and Assigned(LogProc) and WaitUntilTerminated then begin
+      OutputReader := TCreateProcessOutputReader.Create(LogProc, LogProcData);
+      OutputReader.UpdateStartupInfo(StartupInfo, InheritHandles);
+      if InheritHandles then
+        dwCreationFlags := dwCreationFlags or CREATE_NO_WINDOW;
+    end;
+
+    Result := CreateProcess(nil, PChar(CmdLine), nil, nil, InheritHandles,
+      dwCreationFlags, nil, WorkingDirP, StartupInfo, ProcessInfo);
+    if not Result then begin
+      ResultCode := GetLastError;
+      Exit;
+    end;
+    
     { Don't need the thread handle, so close it now }
-    CloseHandle (hThread);
-    if WaitUntilIdle then
-      WaitForInputIdle (hProcess, INFINITE);
-    if WaitUntilTerminated then
-      { Wait until the process returns, but still process any messages that
-        arrive. }
-      repeat
-        { Process any pending messages first because MsgWaitForMultipleObjects
-          (called below) only returns when *new* messages arrive }
-        if Assigned(ProcessMessagesProc) then
-          ProcessMessagesProc;
-      until MsgWaitForMultipleObjects(1, hProcess, False, INFINITE, QS_ALLINPUT) <> WAIT_OBJECT_0+1;
-    { Then close the process handle }
-    GetExitCodeProcess(hProcess, ErrorCode);
-    CloseHandle (hProcess);
+    CloseHandle(ProcessInfo.hThread);
+    if OutputReader <> nil then
+      OutputReader.NotifyCreateProcessDone;
+      
+    try
+      if WaitUntilTerminated then begin
+        while True do begin
+          case WaitForSingleObject(ProcessInfo.hProcess, 50) of
+            WAIT_OBJECT_0: Break;
+            WAIT_TIMEOUT:
+              begin
+                if OutputReader <> nil then
+                  OutputReader.Read(False);
+                Preprocessor.CallIdleProc; { Doesn't allow an Abort }
+              end;
+          else
+            Preprocessor.RaiseError('Exec: WaitForSingleObject failed');
+          end;
+        end;
+        if OutputReader <> nil then
+          OutputReader.Read(True);
+      end;
+      { Get the exit code. Will be set to STILL_ACTIVE if not yet available }
+      if not GetExitCodeProcess(ProcessInfo.hProcess, DWORD(ResultCode)) then
+        ResultCode := -1;  { just in case }
+    finally
+      CloseHandle(ProcessInfo.hProcess);
+    end;
+  finally
+    OutputReader.Free;
   end;
 end;
 
-procedure MsgProc;
-var
-  Msg: TMsg;
+procedure ExecLog(const S: String; const Error, FirstLine: Boolean; const Data: NativeInt);
 begin
-  while PeekMessage(Msg, 0, 0, 0, PM_REMOVE) do
-  begin
-    TranslateMessage(Msg);
-    DispatchMessage(Msg);
-  end;
+  var Preprocessor := TPreprocessor(Data);
+  if Error then
+    Preprocessor.WarningMsg(S)
+  else
+    Preprocessor.StatusMsg('Exec output: %s', [S]);
 end;
 
 {
-  int Exec(str FileName, str Params, str WorkingDir, int Wait, int ShowCmd)
+  int Exec(str FileName, str Params, str WorkingDir, int Wait, int ShowCmd, int Log)
 }
 
 function ExecFunc(Ext: Longint; const Params: IIsppFuncParams;
   const FuncResult: IIsppFuncResult): TIsppFuncResult; stdcall;
-var
-  P, W: string;
-  Wait, S: Integer;
-  Success: Boolean;
-  R: Cardinal;
 begin
-  if CheckParams(Params, [evStr, evStr, evStr, evInt, evInt], 1, Result) then
+  if CheckParams(Params, [evStr, evStr, evStr, evInt, evInt, evInt], 1, Result) then
   try
     with IInternalFuncParams(Params) do
     begin
-      Wait := 1;
-      S := SW_SHOWNORMAL;
-      if GetCount > 1 then P := Get(1).AsStr;
-      if GetCount > 2 then W := PrependPath(Ext, Get(2).AsStr);
-      if (GetCount > 3) and (Get(3).Typ <> evNull) then Wait := Get(3).AsInt;
-      if (GetCount > 4) and (Get(4).Typ <> evNull) then S := Get(4).AsInt;
-      Success := InstExec(Get(0).AsStr, P, W, Wait <> 0, False, S, MsgProc, R);
-      if Wait = 0 then
+      var ParamsS, WorkingDir: String;
+      var WaitUntilTerminated := True;
+      var ShowCmd := SW_SHOWNORMAL;
+      if GetCount > 1 then ParamsS := Get(1).AsStr;
+      if GetCount > 2 then WorkingDir := PrependPath(Ext, Get(2).AsStr);
+      if (GetCount > 3) and (Get(3).Typ <> evNull) then WaitUntilTerminated := Get(3).AsInt <> 0;
+      if (GetCount > 4) and (Get(4).Typ <> evNull) then ShowCmd := Get(4).AsInt;
+      var Preprocessor := TPreprocessor(Ext);
+      var ResultCode: Integer;
+      var Success := Exec(Get(0).AsStr, ParamsS, WorkingDir, WaitUntilTerminated,
+        ShowCmd, Preprocessor, True, ExecLog, NativeInt(Preprocessor), ResultCode);
+      if not WaitUntilTerminated then
         MakeBool(ResPtr^, Success)
       else
-        MakeInt(ResPtr^, R);
+        MakeInt(ResPtr^, ResultCode);
+    end;
+  except
+    on E: Exception do
+    begin
+      FuncResult.Error(PChar(E.Message));
+      Result.Error := ISPPFUNC_FAIL
+    end;
+  end;
+end;
+
+type
+  PExecAndGetFirstLineLogData = ^TExecAndGetFirstLineLogData;
+  TExecAndGetFirstLineLogData = record
+    Preprocessor: TPreprocessor;
+    Line: String;
+  end;
+
+procedure ExecAndGetFirstLineLog(const S: String; const Error, FirstLine: Boolean; const Data: NativeInt);
+begin
+  var Data2 := PExecAndGetFirstLineLogData(Data);
+  if not Error and (Data2.Line = '') and (S.Trim <> '') then
+    Data2.Line := S;
+  ExecLog(S, Error, FirstLine, NativeInt(Data2.Preprocessor));
+end;
+
+{
+  str ExecAndGetFirstLine(str FileName, str Params, str WorkingDir,)
+}
+
+function ExecAndGetFirstLineFunc(Ext: Longint; const Params: IIsppFuncParams;
+  const FuncResult: IIsppFuncResult): TIsppFuncResult; stdcall;
+begin
+  if CheckParams(Params, [evStr, evStr, evStr], 1, Result) then
+  try
+    with IInternalFuncParams(Params) do
+    begin
+      var ParamsS, WorkingDir: String;
+      if GetCount > 1 then ParamsS := Get(1).AsStr;
+      if GetCount > 2 then WorkingDir := PrependPath(Ext, Get(2).AsStr);
+      var Data: TExecAndGetFirstLineLogData;
+      Data.Preprocessor := TPreprocessor(Ext);
+      Data.Line := '';
+      var ResultCode: Integer;
+      var Success := Exec(Get(0).AsStr, ParamsS, WorkingDir, True,
+        SW_SHOWNORMAL, Data.Preprocessor, True, ExecAndGetFirstLineLog, NativeInt(@Data), ResultCode);
+      if Success then
+        MakeStr(ResPtr^, Data.Line)
+      else begin
+        Data.Preprocessor.WarningMsg('CreateProcess failed (%d).', [ResultCode]);
+        ResPtr^.Typ := evNull;
+      end;
     end;
   except
     on E: Exception do
@@ -1368,7 +1458,7 @@ begin
         try
           MakeInt(ResPtr^, 1);
           if not DoAppend and (CodePage = CP_UTF8) then
-            Write(F, #$FEFF); //UTF8 BOM as a single Unicode character
+            Write(F, #$FEFF); //Strings are UTF-16 so this UTF-16 BOM will actually be saved as an UTF-8 BOM
           Write(F, Get(1).AsStr);
         finally
           CloseFile(F);
@@ -1500,19 +1590,19 @@ begin
   try
     with IInternalFuncParams(Params) do
     begin
-      OldDateSeparator := {$IFDEF IS_DXE}FormatSettings.{$ENDIF}DateSeparator;
-      OldTimeSeparator := {$IFDEF IS_DXE}FormatSettings.{$ENDIF}TimeSeparator;
+      OldDateSeparator := FormatSettings.DateSeparator;
+      OldTimeSeparator := FormatSettings.TimeSeparator;
       try
         NewDateSeparatorString := Get(1).AsStr;
         NewTimeSeparatorString := Get(2).AsStr;
         if NewDateSeparatorString <> '' then
-          {$IFDEF IS_DXE}FormatSettings.{$ENDIF}DateSeparator := NewDateSeparatorString[1];
+          FormatSettings.DateSeparator := NewDateSeparatorString[1];
         if NewTimeSeparatorString <> '' then
-          {$IFDEF IS_DXE}FormatSettings.{$ENDIF}TimeSeparator := NewTimeSeparatorString[1];
+          FormatSettings.TimeSeparator := NewTimeSeparatorString[1];
         MakeStr(ResPtr^, FormatDateTime(Get(0).AsStr, Now()));
       finally
-        {$IFDEF IS_DXE}FormatSettings.{$ENDIF}TimeSeparator := OldTimeSeparator;
-        {$IFDEF IS_DXE}FormatSettings.{$ENDIF}DateSeparator := OldDateSeparator;
+        FormatSettings.TimeSeparator := OldTimeSeparator;
+        FormatSettings.DateSeparator := OldDateSeparator;
       end;
     end;
   except
@@ -1535,23 +1625,23 @@ begin
   try
     with IInternalFuncParams(Params) do
     begin
-      OldDateSeparator := {$IFDEF IS_DXE}FormatSettings.{$ENDIF}DateSeparator;
-      OldTimeSeparator := {$IFDEF IS_DXE}FormatSettings.{$ENDIF}TimeSeparator;
+      OldDateSeparator := FormatSettings.DateSeparator;
+      OldTimeSeparator := FormatSettings.TimeSeparator;
       try
         NewDateSeparatorString := Get(2).AsStr;
         NewTimeSeparatorString := Get(3).AsStr;
         if NewDateSeparatorString <> '' then
-          {$IFDEF IS_DXE}FormatSettings.{$ENDIF}DateSeparator := NewDateSeparatorString[1];
+          FormatSettings.DateSeparator := NewDateSeparatorString[1];
         if NewTimeSeparatorString <> '' then
-          {$IFDEF IS_DXE}FormatSettings.{$ENDIF}TimeSeparator := NewTimeSeparatorString[1];
+          FormatSettings.TimeSeparator := NewTimeSeparatorString[1];
         if not FileAge(PrependPath(Ext, Get(0).AsStr), Age) then begin
           FuncResult.Error('Invalid file name');
           Result.Error := ISPPFUNC_FAIL
         end else
           MakeStr(ResPtr^, FormatDateTime(Get(1).AsStr, Age));
       finally
-        {$IFDEF IS_DXE}FormatSettings.{$ENDIF}TimeSeparator := OldTimeSeparator;
-        {$IFDEF IS_DXE}FormatSettings.{$ENDIF}DateSeparator := OldDateSeparator;
+        FormatSettings.TimeSeparator := OldTimeSeparator;
+        FormatSettings.DateSeparator := OldDateSeparator;
       end;
     end;
   except
@@ -1620,7 +1710,6 @@ end;
 
 function GetMD5OfUnicodeString(Ext: Longint; const Params: IIsppFuncParams;
   const FuncResult: IIsppFuncResult): TIsppFuncResult; stdcall;
-{$IFDEF UNICODE}
 var
   S: UnicodeString;
 begin
@@ -1639,12 +1728,6 @@ begin
     end;
   end;
 end;
-{$ELSE}
-begin
-  FuncResult.Error('Cannot call "GetMD5OfUnicodeString" function during non Unicode compilation');
-  Result.Error := ISPPFUNC_FAIL
-end;
-{$ENDIF}
 
 function GetSHA1OfFile(Ext: Longint; const Params: IIsppFuncParams;
   const FuncResult: IIsppFuncResult): TIsppFuncResult; stdcall;
@@ -1703,7 +1786,6 @@ end;
 
 function GetSHA1OfUnicodeString(Ext: Longint; const Params: IIsppFuncParams;
   const FuncResult: IIsppFuncResult): TIsppFuncResult; stdcall;
-{$IFDEF UNICODE}
 var
   S: UnicodeString;
 begin
@@ -1722,12 +1804,6 @@ begin
     end;
   end;
 end;
-{$ELSE}
-begin
-  FuncResult.Error('Cannot call "GetSHA1OfUnicodeString" function during non Unicode compilation');
-  Result.Error := ISPPFUNC_FAIL
-end;
-{$ENDIF}
 
 function TrimFunc(Ext: Longint; const Params: IIsppFuncParams;
   const FuncResult: IIsppFuncResult): TIsppFuncResult; stdcall;
@@ -1792,7 +1868,7 @@ begin
   try
     with IInternalFuncParams(Params) do begin
       { Also see Pragma in IsppPreprocessor }
-      TPreprocessor(Ext).StatusMsg(Get(0).AsStr, []);
+      TPreprocessor(Ext).StatusMsg(Get(0).AsStr);
       ResPtr^ := NULL;
     end;
   except
@@ -1811,7 +1887,7 @@ begin
   try
     with IInternalFuncParams(Params) do begin
       { Also see Pragma in IsppPreprocessor }
-      TPreprocessor(Ext).WarningMsg(Get(0).AsStr, []);
+      TPreprocessor(Ext).WarningMsg(Get(0).AsStr);
       ResPtr^ := NULL;
     end;
   except
@@ -1851,6 +1927,24 @@ begin
   end;
 end;
 
+function AddQuotesFunc(Ext: Longint; const Params: IIsppFuncParams;
+  const FuncResult: IIsppFuncResult): TIsppFuncResult; stdcall;
+begin
+  if CheckParams(Params, [evStr], 1, Result) then
+  try
+    with IInternalFuncParams(Params) do
+    begin
+      MakeStr(ResPtr^, AddQuotes(Get(0).AsStr));
+    end;
+  except
+    on E: Exception do
+    begin
+      FuncResult.Error(PChar(E.Message));
+      Result.Error := ISPPFUNC_FAIL
+    end;
+  end;
+end;
+
 procedure RegisterFunctions(Preproc: TPreprocessor);
 begin
   with Preproc do
@@ -1867,6 +1961,7 @@ begin
     RegisterFunction('WriteIni', WriteIni, -1);
     RegisterFunction('ReadReg', ReadReg, -1);
     RegisterFunction('Exec', ExecFunc, -1);
+    RegisterFunction('ExecAndGetFirstLine', ExecAndGetFirstLineFunc, -1);
     RegisterFunction('Copy', CopyFunc, -1);
     RegisterFunction('Pos', PosFunc, -1);
     RegisterFunction('RPos', RPosFunc, -1);
@@ -1915,6 +2010,7 @@ begin
     RegisterFunction('Message', MessageFunc, -1);
     RegisterFunction('Warning', WarningFunc, -1);
     RegisterFunction('Error', ErrorFunc, -1);
+    RegisterFunction('AddQuotes', AddQuotesFunc, -1)
   end;
 end;
 

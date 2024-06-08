@@ -2,7 +2,7 @@ unit ScintStylerInnoSetup;
 
 {
   Inno Setup
-  Copyright (C) 1997-2020 Jordan Russell
+  Copyright (C) 1997-2024 Jordan Russell
   Portions by Martijn Laan
   For conditions of distribution and use, see LICENSE.TXT.
 
@@ -234,7 +234,7 @@ const
     (Name: 'StrongAssemblyName'),
     (Name: 'Tasks'));
 
-  FilesSectionFlags: array[0..39] of TInnoSetupStylerParamInfo = (
+  FilesSectionFlags: array[0..40] of TInnoSetupStylerParamInfo = (
     (Name: '32bit'),
     (Name: '64bit'),
     (Name: 'allowunsafefiles'),
@@ -264,6 +264,7 @@ const
     (Name: 'setntfscompression'),
     (Name: 'sharedfile'),
     (Name: 'sign'),
+    (Name: 'signcheck'),
     (Name: 'signonce'),
     (Name: 'skipifsourcedoesntexist'),
     (Name: 'solidbreak'),
@@ -383,11 +384,12 @@ const
     (Name: 'Verb'),
     (Name: 'WorkingDir'));
 
-  RunSectionFlags: array[0..17] of TInnoSetupStylerParamInfo = (
+  RunSectionFlags: array[0..18] of TInnoSetupStylerParamInfo = (
     (Name: '32bit'),
     (Name: '64bit'),
     (Name: 'dontlogparameters'),
     (Name: 'hidewizard'),
+    (Name: 'logoutput'),
     (Name: 'nowait'),
     (Name: 'postinstall'),
     (Name: 'runascurrentuser'),
@@ -419,11 +421,12 @@ const
     (Name: 'Verb'),
     (Name: 'WorkingDir'));
 
-  UninstallRunSectionFlags: array[0..12] of TInnoSetupStylerParamInfo = (
+  UninstallRunSectionFlags: array[0..13] of TInnoSetupStylerParamInfo = (
     (Name: '32bit'),
     (Name: '64bit'),
     (Name: 'dontlogparameters'),
     (Name: 'hidewizard'),
+    (Name: 'logoutput'),
     (Name: 'nowait'),
     (Name: 'runascurrentuser'),
     (Name: 'runhidden'),
@@ -709,9 +712,9 @@ end;
 procedure TInnoSetupStyler.ApplyPendingSquigglyFromToIndex(const StartIndex, EndIndex: Integer);
 begin
   if (CaretIndex >= StartIndex) and (CaretIndex <= EndIndex + 1) then
-    ApplyIndicators([inPendingSquiggly], StartIndex, EndIndex)
+    ApplyStyleByteIndicators([inPendingSquiggly], StartIndex, EndIndex)
   else
-    ApplyIndicators([inSquiggly], StartIndex, EndIndex);
+    ApplyStyleByteIndicators([inSquiggly], StartIndex, EndIndex);
 end;
 
 procedure TInnoSetupStyler.ApplyPendingSquigglyFromIndex(const StartIndex: Integer);
@@ -721,7 +724,7 @@ end;
 
 procedure TInnoSetupStyler.ApplySquigglyFromIndex(const StartIndex: Integer);
 begin
-  ApplyIndicators([inSquiggly], StartIndex, CurIndex - 1);
+  ApplyStyleByteIndicators([inSquiggly], StartIndex, CurIndex - 1);
 end;
 
 function TInnoSetupStyler.BuildWordList(const WordStringList: TStringList): AnsiString;
@@ -953,17 +956,17 @@ begin
       if not FTheme.Modern then begin
         { Check for some exceptions }
         case TInnoSetupStylerStyle(Style) of
-          stCompilerDirective: begin Attributes.ForeColor := $4040C0; Exit; end;
+          stCompilerDirective, stISPPReservedWord: begin Attributes.ForeColor := $4040C0; Exit; end;
           stMessageArg: begin Attributes.ForeColor := $FF8000; Exit; end;
           stPascalString, stPascalNumber, stISPPString, stISPPNumber: begin Attributes.ForeColor := clMaroon; Exit; end;
         end;
       end;
       case TInnoSetupStylerStyle(Style) of
-        stCompilerDirective: Attributes.ForeColor := FTheme.Colors[tcRed];
+        stCompilerDirective, stISPPReservedWord: Attributes.ForeColor := FTheme.Colors[tcRed];
         stComment: Attributes.ForeColor := FTheme.Colors[tcGreen];
         stSection: Attributes.FontStyle := [fsBold];
         stSymbol: Attributes.ForeColor := FTheme.Colors[tcGray];
-        stKeyword, stPascalReservedWord, stISPPReservedWord: Attributes.ForeColor := FTheme.Colors[tcBlue];
+        stKeyword, stPascalReservedWord: Attributes.ForeColor := FTheme.Colors[tcBlue];
         //stParameterValue: Attributes.ForeColor := FTheme.Colors[tcTeal];
         stEventFunction: Attributes.FontStyle := [fsBold];
         stConstant: Attributes.ForeColor := FTheme.Colors[tcPurple];
@@ -972,7 +975,7 @@ begin
       end;
     end else begin
       case Style of
-        STYLE_LINENUMBER:
+        STYLE_LINENUMBER: { Also sets the background colour for the margin with the markers like mmIconBreakpoint }
           begin
             Attributes.ForeColor := FTheme.Colors[tcMarginFore];
             Attributes.BackColor := FTheme.Colors[tcMarginBack];
@@ -1548,7 +1551,7 @@ begin
       ReplaceText(I, I, ' ');
       ApplyStyle(Ord(stSymbol), I, I);
       if not ISPPInstalled then
-        ApplyIndicators([inSquiggly], I, I);
+        ApplyStyleByteIndicators([inSquiggly], I, I);
     end;
   end;
 

@@ -2,59 +2,81 @@ program Compil32;
 
 {
   Inno Setup
-  Copyright (C) 1997-2019 Jordan Russell
+  Copyright (C) 1997-2024 Jordan Russell
   Portions by Martijn Laan
   For conditions of distribution and use, see LICENSE.TXT.
 
   Compiler
 }
 
-{$SetPEFlags 1} 
-{$SETPEOSVERSION 6.0}
-{$SETPESUBSYSVERSION 6.0}
-{$WEAKLINKRTTI ON}
-
 uses
-  SafeDLLPath in 'SafeDLLPath.pas',
+  SafeDLLPath in 'Src\SafeDLLPath.pas',
   Windows,
   SysUtils,
   Forms,
-  PathFunc,
-  CompForm in 'CompForm.pas' {CompileForm},
-  CmnFunc in 'CmnFunc.pas',
-  CmnFunc2 in 'CmnFunc2.pas',
-  CompFunc in 'CompFunc.pas',
-  CompMsgs in 'CompMsgs.pas',
-  CompInt in 'CompInt.pas',
-  CompOptions in 'CompOptions.pas' {OptionsForm},
-  CompStartup in 'CompStartup.pas' {StartupForm},
-  CompWizard in 'CompWizard.pas' {WizardForm},
-  CompWizardFile in 'CompWizardFile.pas' {WizardFileForm},
-  CompFileAssoc in 'CompFileAssoc.pas',
+  PathFunc in '..\Components\PathFunc.pas',
+  CompForm in 'Src\CompForm.pas' {CompileForm},
+  CmnFunc in 'Src\CmnFunc.pas',
+  CmnFunc2 in 'Src\CmnFunc2.pas',
+  CompFunc in 'Src\CompFunc.pas',
+  CompMsgs in 'Src\CompMsgs.pas',
+  CompInt in 'Src\CompInt.pas',
+  CompOptions in 'Src\CompOptions.pas' {OptionsForm},
+  CompStartup in 'Src\CompStartup.pas' {StartupForm},
+  CompWizard in 'Src\CompWizard.pas' {WizardForm},
+  CompWizardFile in 'Src\CompWizardFile.pas' {WizardFileForm},
+  CompFileAssoc in 'Src\CompFileAssoc.pas',
   TmSchema in '..\Components\TmSchema.pas',
-  UxTheme in '..\Components\UxTheme.pas',
-  DebugStruct in 'DebugStruct.pas',
-  BrowseFunc in 'BrowseFunc.pas',
-  CompSignTools in 'CompSignTools.pas' {SignToolsForm},
-  CompInputQueryCombo in 'CompInputQueryCombo.pas',
+  NewUxTheme in '..\Components\NewUxTheme.pas',
+  DebugStruct in 'Src\DebugStruct.pas',
+  BrowseFunc in 'Src\BrowseFunc.pas',
+  CompSignTools in 'Src\CompSignTools.pas' {SignToolsForm},
+  CompInputQueryCombo in 'Src\CompInputQueryCombo.pas',
   ScintInt in '..\Components\ScintInt.pas',
   ScintEdit in '..\Components\ScintEdit.pas',
   ScintStylerInnoSetup in '..\Components\ScintStylerInnoSetup.pas',
   ModernColors in '..\Components\ModernColors.pas',
-  CompMessageBoxDesigner in 'CompMessageBoxDesigner.pas' {MBDForm},
-  CompScintEdit in 'CompScintEdit.pas';
+  CompMsgBoxDesigner in 'Src\CompMsgBoxDesigner.pas' {MsgBoxDesignerForm},
+  CompScintEdit in 'Src\CompScintEdit.pas',
+  CompFilesDesigner in 'Src\CompFilesDesigner.pas' {FilesDesignerForm},
+  CompWizardFilesHelper in 'Src\CompWizardFilesHelper.pas',
+  NewTabSet in '..\Components\NewTabSet.pas',
+  NewStaticText in '..\Components\NewStaticText.pas',
+  BidiUtils in '..\Components\BidiUtils.pas',
+  DropListBox in '..\Components\DropListBox.pas',
+  NewCheckListBox in '..\Components\NewCheckListBox.pas',
+  NewNotebook in '..\Components\NewNotebook.pas',
+  TaskbarProgressFunc in 'Src\TaskbarProgressFunc.pas',
+  HtmlHelpFunc in 'Src\HtmlHelpFunc.pas',
+  UIStateForm in 'Src\UIStateForm.pas',
+  LangOptionsSectionDirectives in 'Src\LangOptionsSectionDirectives.pas',
+  MsgIDs in 'Src\MsgIDs.pas',
+  SetupSectionDirectives in 'Src\SetupSectionDirectives.pas',
+  CompTypes in 'Src\CompTypes.pas',
+  FileClass in 'Src\FileClass.pas',
+  Int64Em in 'Src\Int64Em.pas',
+  Compress in 'Src\Compress.pas',
+  TaskDialog in 'Src\TaskDialog.pas',
+  CompRegistryDesigner in 'Src\CompRegistryDesigner.pas' {RegistryDesignerForm},
+  CompWizardRegistryHelper in 'Src\CompWizardRegistryHelper.pas',
+  MD5 in 'Src\MD5.pas';
 
-{$R *.res}
-{$R Compil32.manifest.res}
-{$R CompDocIcon.res}
+{$SetPEFlags IMAGE_FILE_RELOCS_STRIPPED}
+{$SETPEOSVERSION 6.1}
+{$SETPESUBSYSVERSION 6.1}
+{$WEAKLINKRTTI ON}
+
+{$R Res\Compil32.docicon.res}
+{$R Res\Compil32.manifest.res}
+{$R Res\Compil32.versionandicon.res}
 
 procedure SetAppUserModelID;
 var
   Func: function(AppID: PWideChar): HRESULT; stdcall;
 begin
-  { On Windows 7, for the IDE to be pinnable and show a Jump List, it is
-    necessary to explicitly assign an AppUserModelID because by default the
-    taskbar excludes applications that have "Setup" in their name. }
+  { For the IDE to be pinnable and show a Jump List, it is necessary to
+    explicitly assign an AppUserModelID because by default the taskbar excludes
+    applications that have "Setup" in their name. }
   Func := GetProcAddress(GetModuleHandle('shell32.dll'),
     'SetCurrentProcessExplicitAppUserModelID');
   if Assigned(Func) then
@@ -89,7 +111,7 @@ begin
       if CommandLineCompile then
         CommandLine := '/CC ' + CommandLine;
     end;
-    
+
     if Length(CommandLine) > RESTART_MAX_CMD_LINE then
       CommandLine := '';
 
@@ -109,7 +131,7 @@ const
   MutexName = 'InnoSetupCompilerAppMutex';
 begin
   CreateMutex(MutexName);
-  CreateMutex('Global\' + MutexName);  { don't localize }
+  CreateMutex('Global\' + MutexName); { don't localize }
 end;
 
 var

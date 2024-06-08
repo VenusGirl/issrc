@@ -3,7 +3,7 @@
   Copyright (C) 2001-2002 Alex Yackimoff
  
   Inno Setup
-  Copyright (C) 1997-2020 Jordan Russell
+  Copyright (C) 1997-2024 Jordan Russell
   Portions by Martijn Laan
   For conditions of distribution and use, see LICENSE.TXT.
 }
@@ -88,9 +88,9 @@ var
     else if OptName = 'ISPP:VerboseLevel' then
       ISPPOptions.VerboseLevel := StrToIntDef(OptValue, 0)
     else if OptName = 'ISPP:InlineStart' then
-      ISPPOptions.InlineStart := AnsiString(OptValue)
+      ISPPOptions.InlineStart := OptValue
     else if OptName = 'ISPP:InlineEnd' then
-      ISPPOptions.InlineEnd := AnsiString(OptValue)
+      ISPPOptions.InlineEnd := OptValue
     else if OptName = 'ISPP:Definitions' then
       Definitions := OptValue
     else if OptName = 'ISPP:IncludePath' then
@@ -222,7 +222,7 @@ var
   LineNumber: Integer;
 begin
   if (Params.Size <> SizeOf(Params)) or
-     (Params.InterfaceVersion <> 2) then
+     (Params.InterfaceVersion <> 3) then
   begin
     Result := ispeInvalidParam;
     Exit;

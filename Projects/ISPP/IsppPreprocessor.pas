@@ -3,7 +3,7 @@
   Copyright (C) 2001-2002 Alex Yackimoff
   
   Inno Setup
-  Copyright (C) 1997-2020 Jordan Russell
+  Copyright (C) 1997-2024 Jordan Russell
   Portions by Martijn Laan
   For conditions of distribution and use, see LICENSE.TXT.
 }
@@ -14,8 +14,6 @@ interface
 
 uses Windows, SysUtils, Classes, CompPreprocInt, IniFiles, Registry, IsppIntf,
   IsppBase, IsppStack, IsppIdentMan, IsppParser;
-
-{$I ..\Version.inc}
 
 type
 
@@ -125,9 +123,13 @@ type
       VarManager: TIdentManager; const Options: TIsppOptions;
       const SourcePath: string; const CompilerPath: string; const FileName: string = '');
     destructor Destroy; override;
-    procedure VerboseMsg(Level: Byte; const Msg: string; const Args: array of const);
-    procedure StatusMsg(const Msg: string; const Args: array of const);
-    procedure WarningMsg(const Msg: string; const Args: array of const);
+    procedure CallIdleProc;
+    procedure VerboseMsg(Level: Byte; const Msg: string); overload;
+    procedure VerboseMsg(Level: Byte; const Msg: string; const Args: array of const); overload;
+    procedure StatusMsg(const Msg: string); overload;
+    procedure StatusMsg(const Msg: string; const Args: array of const); overload;
+    procedure WarningMsg(const Msg: string); overload;
+    procedure WarningMsg(const Msg: string; const Args: array of const); overload;
     function GetNextOutputLine(var LineFilename: string; var LineNumber: Integer;
       var LineText: string): Boolean;
     procedure GetNextOutputLineReset;
@@ -442,14 +444,14 @@ var
     Result := False;
     while P^ <> #0 do
     begin
-      if AnsiChar(P^) = FOptions.InlineStart[1] then
+      if P^ = FOptions.InlineStart[1] then
       begin
         D := P;
         Result := True;
-        for I := 2 to Byte(FOptions.InlineStart[0]) do
+        for I := 2 to Length(FOptions.InlineStart) do
         begin
           Inc(D);
-          if AnsiChar(D^) <> FOptions.InlineStart[I] then
+          if D^ <> FOptions.InlineStart[I] then
           begin
             Result := False;
             Break;
@@ -469,13 +471,13 @@ var
     Result := nil;
     while P^ <> #0 do
     begin
-      if AnsiChar(P^) = FOptions.InlineEnd[1] then
+      if P^ = FOptions.InlineEnd[1] then
       begin
         Result := P;
-        for I := 2 to Byte(FOptions.InlineEnd[0]) do
+        for I := 2 to Length(FOptions.InlineEnd) do
         begin
           Inc(P);
-          if AnsiChar(P^) <> FOptions.InlineEnd[I] then
+          if P^ <> FOptions.InlineEnd[I] then
           begin
             Result := nil;
             Break;
@@ -807,11 +809,11 @@ function TPreprocessor.ProcessPreprocCommand(Command: TPreprocessorCommand;
         if P = 'include' then
           FIncludePath := StrPragma(True)
         else if P = 'inlinestart' then
-          FOptions.InlineStart := AnsiString(StrPragma(False))
+          FOptions.InlineStart := StrPragma(False)
         else if P = 'inlineend' then
-          FOptions.InlineEnd := AnsiString(StrPragma(False))
+          FOptions.InlineEnd := StrPragma(False)
         else if P = 'spansymbol' then
-          FOptions.SpanSymbol := AnsiChar(StrPragma(False)[1])
+          FOptions.SpanSymbol := StrPragma(False)[1]
         else if P = 'parseroption' then
           OptionPragma(FOptions.ParserOptions.Options)
         else if P = 'option' then
@@ -825,10 +827,10 @@ function TPreprocessor.ProcessPreprocCommand(Command: TPreprocessorCommand;
         end
         else if P = 'warning' then begin
           { Also see WarningFunc in IsppFuncs }
-          WarningMsg(StrPragma(True), [])
+          WarningMsg(StrPragma(True))
         end else if P = 'message' then begin
           { Also see MessageFunc in IsppFuncs }
-          StatusMsg(StrPragma(True), [])
+          StatusMsg(StrPragma(True))
         end else if P = 'error' then begin
           { Also see ErrorFunc in IsppFuncs }
           ErrorMsg := StrPragma(True);
@@ -837,11 +839,11 @@ function TPreprocessor.ProcessPreprocCommand(Command: TPreprocessorCommand;
           RaiseError(ErrorMsg)
         end
         else
-          WarningMsg(SFailedToParsePragmaDirective, []);
+          WarningMsg(SFailedToParsePragmaDirective);
       end;
     except
       if CatchException then
-        WarningMsg(SFailedToParsePragmaDirective, [])
+        WarningMsg(SFailedToParsePragmaDirective)
       else
         raise
     end;
@@ -859,11 +861,7 @@ function TPreprocessor.ProcessPreprocCommand(Command: TPreprocessorCommand;
       if Windows.GetTempFileName(PChar(Path), PChar(UpperCase(Original)), 0, PChar(Result)) <> 0 then
         SetLength(Result, StrLen(PChar(Result)))
       else
-        {$IFDEF IS_D7}
-        RaiseLastOSError
-        {$ELSE}
-        RaiseLastWin32Error;
-        {$ENDIF}
+        RaiseLastOSError;
     end;
 
   var
@@ -939,7 +937,7 @@ function TPreprocessor.ProcessPreprocCommand(Command: TPreprocessorCommand;
 
   procedure EndGlue;
   begin
-    VerboseMsg(2, SResettingInsertionPoint, []);
+    VerboseMsg(2, SResettingInsertionPoint);
     FInsertionPoint := -1;
   end;
 
@@ -982,7 +980,7 @@ begin
             evInt: Result := IfCondition.AsInt <> 0;
             evStr: Result := IfCondition.AsStr <> ''
           else
-            WarningMsg(SSpecifiedConditionEvalatedToVoid, []);
+            WarningMsg(SSpecifiedConditionEvalatedToVoid);
             Result := False
           end;
         end;
@@ -995,12 +993,12 @@ begin
             itFunc:
             begin
               Result := Command = pcIfDef;
-              WarningMsg(SFuncIdentForIfdef, []);
+              WarningMsg(SFuncIdentForIfdef);
             end;
             else
             begin
               Result := Command = pcIfNDef;
-              WarningMsg(SSpecFuncIdentForIfdef, []);
+              WarningMsg(SSpecFuncIdentForIfdef);
             end;
           end;
           EndOfExpr;
@@ -1047,7 +1045,7 @@ var
   L: Integer;
 begin
   L := Length(LineRead);
-  if (L > 2) and (AnsiChar(LineRead[L]) = FOptions.SpanSymbol) and (LineRead[L - 1] <= #32) then
+  if (L > 2) and (LineRead[L] = FOptions.SpanSymbol) and (LineRead[L - 1] <= #32) then
   begin
     FQueuedLine := FQueuedLine + TrimLeft(Copy(LineRead, 1, L - 1));
     Inc(FQueuedLineCount);
@@ -1079,20 +1077,14 @@ begin
 end;
 
 procedure TPreprocessor.SaveToFile(const FileName: string);
-{$IFDEF UNICODE}
-var
-  S: String;
-{$ENDIF}
 begin
-{$IFDEF UNICODE}
-  S := FOutput.Text;
-  if SameText(S, String(AnsiString(S))) then
-    FOutput.SaveToFile(FileName)
-  else
+  var OldWriteBOM := FOutput.WriteBOM;
+  try
+    FOutput.WriteBOM := False;
     FOutput.SaveToFile(FileName, TEncoding.UTF8);
-{$ELSE}
-  FOutput.SaveToFile(FileName)
-{$ENDIF}
+  finally
+    FOutput.WriteBOM := OldWriteBOM;
+  end;
 end;
 
 function TPreprocessor.CheckFile(const FileName: string): Boolean;
@@ -1110,21 +1102,41 @@ begin
   FFileStack.AddObject(ExpandFileName(FileName), TObject(dsPublic));
 end;
 
+procedure TPreprocessor.CallIdleProc;
+begin
+  FCompilerParams.IdleProc(FCompilerParams.CompilerData);
+end;
+
+procedure TPreprocessor.VerboseMsg(Level: Byte; const Msg: string);
+begin
+  if (optVerbose in FOptions.Options) and (FOptions.VerboseLevel >= Level) then
+    StatusMsg(Msg);
+end;
+
 procedure TPreprocessor.VerboseMsg(Level: Byte; const Msg: string;
   const Args: array of const);
 begin
-  if (optVerbose in FOptions.Options) and (FOptions.VerboseLevel >= Level) then
-    StatusMsg(Msg, Args);
+  VerboseMsg(Level, Format(Msg, Args));
+end;
+
+procedure TPreprocessor.StatusMsg(const Msg: string);
+begin
+  SendMsg(Msg, imtStatus);
 end;
 
 procedure TPreprocessor.StatusMsg(const Msg: string; const Args: array of const);
 begin
-  SendMsg(Format(Msg, Args), imtStatus);
+  StatusMsg(Format(Msg, Args));
+end;
+
+procedure TPreprocessor.WarningMsg(const Msg: string);
+begin
+  SendMsg(Msg, imtWarning);
 end;
 
 procedure TPreprocessor.WarningMsg(const Msg: string; const Args: array of const);
 begin
-  SendMsg(Format(Msg, Args), imtWarning);
+  WarningMsg(Format(Msg, Args));
 end;
 
 procedure TPreprocessor.SendMsg(Msg: string; Typ: TIsppMessageType);
@@ -1296,11 +1308,11 @@ begin
     cvmElse: M := SUpdatingConditionalInclusionElse;
   else
     begin
-      FPreproc.VerboseMsg(6, SFinishedConditionalInclusion, []);
+      FPreproc.VerboseMsg(6, SFinishedConditionalInclusion);
       Exit;
     end;
   end;
-  FPreproc.VerboseMsg(6, M, []);
+  FPreproc.VerboseMsg(6, M);
 end;
 
 { TPreprocessor }
@@ -1408,13 +1420,8 @@ end;
 
 function LookupAlwaysDefined(const Name: string): Boolean;
 const
-{$IFDEF UNICODE}
   AlwaysDefined: array[0..3] of string =
     ('ISPP_INVOKED', 'WINDOWS', '__WIN32__', 'UNICODE');
-{$ELSE}
-  AlwaysDefined: array[0..2] of string =
-    ('ISPP_INVOKED', 'WINDOWS', '__WIN32__');
-{$ENDIF}
 var
   I: Integer;
 begin

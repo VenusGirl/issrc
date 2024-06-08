@@ -2,38 +2,44 @@ program SetupLdr;
 
 {
   Inno Setup
-  Copyright (C) 1997-2020 Jordan Russell
+  Copyright (C) 1997-2024 Jordan Russell
   Portions by Martijn Laan
   For conditions of distribution and use, see LICENSE.TXT.
 
   Setup Loader
 }
 
-{$SetPEFlags 1} 
+uses
+  SafeDLLPath in 'Src\SafeDLLPath.pas',
+  XPTheme in 'Src\XPTheme.pas',
+  Windows,
+  Messages,
+  SysUtils,
+  Compress in 'Src\Compress.pas',
+  LZMADecompSmall in 'Src\LZMADecompSmall.pas',
+  SetupEnt in 'Src\SetupEnt.pas',
+  PathFunc in '..\Components\PathFunc.pas',
+  CmnFunc2 in 'Src\CmnFunc2.pas',
+  Msgs in 'Src\Msgs.pas',
+  MsgIDs in 'Src\MsgIDs.pas',
+  Struct in 'Src\Struct.pas',
+  InstFunc in 'Src\InstFunc.pas',
+  FileClass in 'Src\FileClass.pas',
+  Int64Em in 'Src\Int64Em.pas',
+  SHA1 in 'Src\SHA1.pas',
+  MD5 in 'Src\MD5.pas',
+  RedirFunc in 'Src\RedirFunc.pas',
+  SetupTypes in 'Src\SetupTypes.pas',
+  VerInfo in 'Src\VerInfo.pas';
+
+{$SetPEFlags IMAGE_FILE_RELOCS_STRIPPED}
 {$SETPEOSVERSION 6.1}
 {$SETPESUBSYSVERSION 6.1}
 {$WEAKLINKRTTI ON}
 
-uses
-  SafeDLLPath in 'SafeDLLPath.pas',
-  XPTheme in 'XPTheme.pas',
-  Windows,
-  Messages,
-  SysUtils,
-  Compress in 'Compress.pas',
-  LZMADecompSmall in 'LZMADecompSmall.pas',
-  SetupEnt in 'SetupEnt.pas',
-  PathFunc,
-  CmnFunc2 in 'CmnFunc2.pas',
-  Msgs in 'Msgs.pas',
-  MsgIDs in 'MsgIDs.pas',
-  Struct in 'Struct.pas',
-  InstFunc in 'InstFunc.pas',
-  FileClass in 'FileClass.pas';
-
-{$R *.RES}
-{$R SetupLdrVersion.res}
-{$R SetupLdrOffsetTable.res}
+{$R Res\Setup.icon.res}
+{$R Res\SetupLdr.version.res}
+{$R Res\SetupLdr.offsettable.res}
 
 procedure RaiseLastError(const Msg: TSetupMessageID);
 var
@@ -439,7 +445,7 @@ begin
         { Create a temporary directory, and extract the embedded setup program
           there }
         Randomize;
-        TempDir := CreateTempDir;
+        TempDir := CreateTempDir(IsAdminLoggedOn);
         S := AddBackslash(TempDir) + PathChangeExt(PathExtractName(SelfFilename), '.tmp');
         TempFile := S;  { assign only if string was successfully constructed }
 

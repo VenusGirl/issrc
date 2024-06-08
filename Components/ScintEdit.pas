@@ -2,7 +2,7 @@ unit ScintEdit;
 
 {
   Inno Setup
-  Copyright (C) 1997-2020 Jordan Russell
+  Copyright (C) 1997-2024 Jordan Russell
   Portions by Martijn Laan
   For conditions of distribution and use, see LICENSE.TXT.
 
@@ -12,7 +12,7 @@ unit ScintEdit;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, ScintInt;
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Generics.Collections, ScintInt;
 
 type
   TScintEditAutoCompleteSelectionEvent = TNotifyEvent;
@@ -25,7 +25,7 @@ type
   TScintEditCharAddedEvent = procedure(Sender: TObject; Ch: AnsiChar) of object;
   TScintEditDropFilesEvent = procedure(Sender: TObject; X, Y: Integer;
     AFiles: TStrings) of object;
-  TScintHintInfo = {$IFDEF UNICODE} Controls. {$ENDIF} THintInfo;
+  TScintHintInfo = Controls.THintInfo;
   TScintEditHintShowEvent = procedure(Sender: TObject;
     var Info: TScintHintInfo) of object;
   TScintEditMarginClickEvent = procedure(Sender: TObject; MarginNumber: Integer;
@@ -33,17 +33,22 @@ type
   TScintFindOption = (sfoMatchCase, sfoWholeWord);
   TScintFindOptions = set of TScintFindOption;
   TScintIndentationGuides = (sigNone, sigReal, sigLookForward, sigLookBoth);
-  TScintIndicatorNumber = 0..2;
-  TScintIndicatorNumbers = set of TScintIndicatorNumber;
+  TScintStyleByteIndicatorNumber = 0..2; { These use unused style bits of which there are 3. Assumes SCI_SETSTYLEBITS isn't used to change the default used style bits from 5 to a higher number. }
+  TScintStyleByteIndicatorNumbers = set of TScintStyleByteIndicatorNumber;
+  TScintIndicatorNumber = INDIC_CONTAINER..INDIC_MAX;
   TScintLineEndings = (sleCRLF, sleCR, sleLF);
   TScintLineState = type Integer;
   TScintMarkerNumber = 0..31;
   TScintMarkerNumbers = set of TScintMarkerNumber;
   TScintRange = record
     StartPos, EndPos: Integer;
+    constructor Create(const AStartPos, AEndPos: Integer);
+    function Overlaps(const ARange: TScintRange): Boolean;
+    function Within(const ARange: TScintRange): Boolean;
   end;
+  TScintRangeList = TList<TScintRange>;
   TScintRawCharSet = set of AnsiChar;
-  TScintRawString = type {$IFDEF UNICODE} RawByteString {$ELSE} AnsiString {$ENDIF};
+  TScintRawString = type RawByteString;
   TScintRectangle = record
     Left, Top, Right, Bottom: Integer;
   end;
@@ -83,6 +88,7 @@ type
     FOnMarginClick: TScintEditMarginClickEvent;
     FOnModifiedChange: TNotifyEvent;
     FOnUpdateUI: TNotifyEvent;
+    FOnZoom: TNotifyEvent;
     FReportCaretPositionToStyler: Boolean;
     FStyler: TScintCustomStyler;
     FTabWidth: Integer;
@@ -93,7 +99,7 @@ type
     procedure ApplyOptions;
     function GetAutoCompleteActive: Boolean;
     function GetCaretColumn: Integer;
-    function GetCaretColumnExpanded: Integer;
+    function GetCaretColumnExpandedForTabs: Integer;
     function GetCaretLine: Integer;
     function GetCaretPosition: Integer;
     function GetCaretVirtualSpace: Integer;
@@ -107,6 +113,9 @@ type
     function GetRawText: TScintRawString;
     function GetReadOnly: Boolean;
     function GetSelection: TScintRange;
+    function GetSelectionAnchorPosition(Selection: Integer): Integer;
+    function GetSelectionCaretPosition(Selection: Integer): Integer;
+    function GetSelectionCount: Integer;
     function GetSelText: String;
     function GetTopLine: Integer;
     function GetZoom: Integer;
@@ -121,10 +130,13 @@ type
     procedure SetFillSelectionToEdge(const Value: Boolean);
     procedure SetIndentationGuides(const Value: TScintIndentationGuides);
     procedure SetLineNumbers(const Value: Boolean);
+    procedure SetMainSelection(const Value: Integer);
     procedure SetRawSelText(const Value: TScintRawString);
     procedure SetRawText(const Value: TScintRawString);
     procedure SetReadOnly(const Value: Boolean);
     procedure SetSelection(const Value: TScintRange);
+    procedure SetSelectionAnchorPosition(Selection: Integer; const AnchorPos: Integer);
+    procedure SetSelectionCaretPosition(Selection: Integer; const CaretPos: Integer);
     procedure SetSelText(const Value: String);
     procedure SetStyler(const Value: TScintCustomStyler);
     procedure SetTabWidth(const Value: Integer);
@@ -134,7 +146,6 @@ type
     procedure SetVirtualSpaceOptions(const Value: TScintVirtualSpaceOptions);
     procedure SetWordWrap(const Value: Boolean);
     procedure SetZoom(const Value: Integer);
-    procedure StyleNeeded(const EndPos: Integer);
     procedure UpdateCodePage;
     procedure UpdateLineNumbersWidth;
     procedure CMColorChanged(var Message: TMessage); message CM_COLORCHANGED;
@@ -165,6 +176,8 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure AddMarker(const Line: Integer; const Marker: TScintMarkerNumber);
+    procedure AddIndicator(const StartPos, EndPos: Integer;
+      const IndicatorNumber: TScintIndicatorNumber);
     procedure BeginUndoAction;
     function Call(Msg: Cardinal; WParam: Longint; LParam: Longint): Longint;
     function CallStr(Msg: Cardinal; WParam: Longint;
@@ -174,6 +187,7 @@ type
     function CanUndo: Boolean;
     procedure ChooseCaretX;
     procedure ClearAll;
+    procedure ClearIndicators(const IndicatorNumber: TScintIndicatorNumber);
     procedure ClearSelection;
     procedure ClearUndo;
     function ConvertRawStringToString(const S: TScintRawString): String;
@@ -196,7 +210,7 @@ type
     function GetColumnFromPosition(const Pos: Integer): Integer;
     function GetDefaultWordChars: AnsiString;
     function GetDocLineFromVisibleLine(const VisibleLine: Integer): Integer;
-    function GetIndicatorsAtPosition(const Pos: Integer): TScintIndicatorNumbers;
+    function GetStyleByteIndicatorsAtPosition(const Pos: Integer): TScintStyleByteIndicatorNumbers;
     function GetLineEndPosition(const Line: Integer): Integer;
     function GetLineFromPosition(const Pos: Integer): Integer;
     function GetLineIndentation(const Line: Integer): Integer;
@@ -222,12 +236,14 @@ type
     procedure PasteFromClipboard;
     function RawSelTextEquals(const S: TScintRawString; const MatchCase: Boolean): Boolean;
     procedure Redo;
+    procedure RemoveAdditionalSelections;
     function ReplaceRawTextRange(const StartPos, EndPos: Integer;
       const S: TScintRawString): TScintRange;
     function ReplaceTextRange(const StartPos, EndPos: Integer; const S: String): TScintRange;
     procedure RestyleLine(const Line: Integer);
     procedure ScrollCaretIntoView;
-    function SelAvail: Boolean;
+    function SelNotEmpty: Boolean; overload;
+    function SelNotEmpty(out Sel: TScintRange): Boolean; overload;
     procedure SelectAll;
     function SelTextEquals(const S: String; const MatchCase: Boolean): Boolean;
     procedure SetAutoCompleteFillupChars(const FillupChars: AnsiString);
@@ -237,19 +253,22 @@ type
     procedure SetBraceHighlighting(const Pos1, Pos2: Integer);
     procedure SetCursorID(const CursorID: Integer);
     procedure SetDefaultWordChars;
-    procedure SetEmptySelection;
+    procedure SetEmptySelections;
     procedure SetLineIndentation(const Line, Indentation: Integer);
     procedure SetSavePoint;
+    procedure SetSingleSelection(const CaretPos, AnchorPos: Integer);
     procedure SetWordChars(const S: AnsiString);
     procedure ShowAutoComplete(const CharsEntered: Integer; const WordList: AnsiString);
+    procedure StyleNeeded(const EndPos: Integer);
     procedure Undo;
     procedure UpdateStyleAttributes;
     function WordAtCursor: String;
+    function WordAtCursorRange: TScintRange;
     procedure ZoomIn;
     procedure ZoomOut;
     property AutoCompleteActive: Boolean read GetAutoCompleteActive;
     property CaretColumn: Integer read GetCaretColumn write SetCaretColumn;
-    property CaretColumnExpanded: Integer read GetCaretColumnExpanded;
+    property CaretColumnExpandedForTabs: Integer read GetCaretColumnExpandedForTabs;
     property CaretLine: Integer read GetCaretLine write SetCaretLine;
     property CaretPosition: Integer read GetCaretPosition write SetCaretPosition;
     property CaretVirtualSpace: Integer read GetCaretVirtualSpace write SetCaretVirtualSpace;
@@ -260,12 +279,16 @@ type
     property LineHeight: Integer read GetLineHeight;
     property Lines: TScintEditStrings read FLines;
     property LinesInWindow: Integer read GetLinesInWindow;
+    property MainSelection: Integer read GetMainSelection write SetMainSelection;
     property Modified: Boolean read GetModified;
     property RawSelText: TScintRawString read GetRawSelText write SetRawSelText;
     property RawText: TScintRawString read GetRawText write SetRawText;
     property RawTextLength: Integer read GetRawTextLength;
     property ReadOnly: Boolean read GetReadOnly write SetReadOnly;
     property Selection: TScintRange read GetSelection write SetSelection;
+    property SelectionAnchorPosition[Selection: Integer]: Integer read GetSelectionAnchorPosition write SetSelectionAnchorPosition;
+    property SelectionCaretPosition[Selection: Integer]: Integer read GetSelectionCaretPosition write SetSelectionCaretPosition;
+    property SelectionCount: Integer read GetSelectionCount;
     property SelText: String read GetSelText write SetSelText;
     property Styler: TScintCustomStyler read FStyler write SetStyler;
     property TopLine: Integer read GetTopLine write SetTopLine;
@@ -312,6 +335,7 @@ type
     property OnMouseMove;
     property OnMouseUp;
     property OnUpdateUI: TNotifyEvent read FOnUpdateUI write FOnUpdateUI;
+    property OnZoom: TNotifyEvent read FOnZoom write FOnZoom;
   end;
 
   TScintEditStrings = class(TStrings)
@@ -327,9 +351,6 @@ type
   protected
     procedure CheckIndexRange(const Index: Integer);
     procedure CheckIndexRangePlusOne(const Index: Integer);
-{$IFNDEF UNICODE}
-    class procedure Error(Msg: PResStringRec; Data: Integer);
-{$ENDIF}
     function Get(Index: Integer): String; override;
     function GetCount: Integer; override;
     function GetTextStr: String; override;
@@ -369,7 +390,7 @@ type
     function GetCurChar: AnsiChar;
     function GetEndOfLine: Boolean;
   protected
-    procedure ApplyIndicators(const Indicators: TScintIndicatorNumbers;
+    procedure ApplyStyleByteIndicators(const Indicators: TScintStyleByteIndicatorNumbers;
       StartIndex, EndIndex: Integer);
     procedure ApplyStyle(const Style: TScintStyleNumber;
       StartIndex, EndIndex: Integer);
@@ -400,12 +421,34 @@ type
     property TextLength: Integer read FTextLen;
   end;
 
+  TScintPixmap = class
+  private
+    class var ColorCodes: String;
+    class constructor Create;
+    type TPixmap = array of AnsiString;
+    var FPixmap: TPixmap;
+    function GetPixmap: Pointer;
+  public
+    procedure InitializeFromBitmap(const ABitmap: TBitmap; const TransparentColor: TColorRef);
+    property Pixmap: Pointer read GetPixmap;
+  end;
+
   EScintEditError = class(Exception);
+
+function ScintRawStringIsBlank(const S: TScintRawString): Boolean;
 
 implementation
 
 uses
-  ShellAPI, RTLConsts, UITypes;
+  ShellAPI, RTLConsts, UITypes, GraphUtil;
+
+function ScintRawStringIsBlank(const S: TScintRawString): Boolean;
+begin
+  for var I := 1 to Length(S) do
+    if not(S[I] in [#9, ' ']) then
+      Exit(False);
+  Result := True;
+end;
 
 { TScintEdit }
 
@@ -431,6 +474,15 @@ begin
   FLines.Free;
   FLines := nil;
   inherited;
+end;
+
+procedure TScintEdit.AddIndicator(const StartPos, EndPos: Integer;
+  const IndicatorNumber: TScintIndicatorNumber);
+begin
+  CheckPosRange(StartPos, EndPos);
+  Call(SCI_SETINDICATORCURRENT, IndicatorNumber, 0);
+  Call(SCI_SETINDICATORVALUE, IndicatorNumber, 1);
+  Call(SCI_INDICATORFILLRANGE, StartPos, EndPos - StartPos);
 end;
 
 procedure TScintEdit.AddMarker(const Line: Integer;
@@ -537,6 +589,13 @@ begin
   ChooseCaretX;
 end;
 
+procedure TScintEdit.ClearIndicators(
+  const IndicatorNumber: TScintIndicatorNumber);
+begin
+  Call(SCI_SETINDICATORCURRENT, IndicatorNumber, 0);
+  Call(SCI_INDICATORCLEARRANGE, 0, RawTextLength);
+end;
+
 procedure TScintEdit.ClearSelection;
 begin
   Call(SCI_CLEAR, 0, 0);
@@ -552,7 +611,6 @@ begin
 end;
 
 function TScintEdit.ConvertRawStringToString(const S: TScintRawString): String;
-{$IFDEF UNICODE}
 var
   SrcLen, DestLen: Integer;
   DestStr: UnicodeString;
@@ -569,22 +627,14 @@ begin
   end;
   Result := DestStr;
 end;
-{$ELSE}
-begin
-  Result := S;
-end;
-{$ENDIF}
 
 function TScintEdit.ConvertPCharToRawString(const Text: PChar;
   const TextLen: Integer): TScintRawString;
 var
-{$IFDEF UNICODE}
   DestLen: Integer;
-{$ENDIF}
   DestStr: TScintRawString;
 begin
   if TextLen > 0 then begin
-{$IFDEF UNICODE}
     DestLen := WideCharToMultiByte(FCodePage, 0, Text, TextLen, nil, 0, nil, nil);
     if DestLen <= 0 then
       Error('WideCharToMultiByte failed');
@@ -592,20 +642,13 @@ begin
     if WideCharToMultiByte(FCodePage, 0, Text, TextLen, @DestStr[1], Length(DestStr),
        nil, nil) <> DestLen then
       Error('Unexpected result from WideCharToMultiByte');
-{$ELSE}
-    SetString(DestStr, Text, TextLen);
-{$ENDIF}
   end;
   Result := DestStr;
 end;
 
 function TScintEdit.ConvertStringToRawString(const S: String): TScintRawString;
 begin
-{$IFDEF UNICODE}
   Result := ConvertPCharToRawString(PChar(S), Length(S));
-{$ELSE}
-  Result := S;
-{$ENDIF}
 end;
 
 procedure TScintEdit.CopyToClipboard;
@@ -633,12 +676,6 @@ begin
   Call(SCI_SETSCROLLWIDTHTRACKING, 1, 0);
   { The default popup menu conflicts with the VCL's PopupMenu on Delphi 3 }
   Call(SCI_USEPOPUP, 0, 0);
-{$IFNDEF UNICODE}
-  { This hack is needed because non-Unicode VCL replaces the Scintilla's
-    default Unicode window proc with an ANSI one }
-  if Win32Platform = VER_PLATFORM_WIN32_NT then
-    Call(SCI_SETKEYSUNICODE, 1, 0);
-{$ENDIF}
   SetDefaultWordChars;
   ApplyOptions;
   UpdateStyleAttributes;
@@ -730,7 +767,7 @@ begin
   Result := GetColumnFromPosition(GetCaretPosition);
 end;
 
-function TScintEdit.GetCaretColumnExpanded: Integer;
+function TScintEdit.GetCaretColumnExpandedForTabs: Integer;
 begin
   Result := Call(SCI_GETCOLUMN, GetCaretPosition, 0);
   Inc(Result, GetCaretVirtualSpace);
@@ -774,12 +811,12 @@ begin
   Result := Call(SCI_DOCLINEFROMVISIBLE, VisibleLine, 0);
 end;
 
-function TScintEdit.GetIndicatorsAtPosition(const Pos: Integer): TScintIndicatorNumbers;
+function TScintEdit.GetStyleByteIndicatorsAtPosition(const Pos: Integer): TScintStyleByteIndicatorNumbers;
 var
   Indic: Byte;
 begin
   Indic := Byte(Call(SCI_GETSTYLEAT, Pos, 0)) shr 5;
-  Result := TScintIndicatorNumbers(Indic);
+  Result := TScintStyleByteIndicatorNumbers(Indic);
 end;
 
 function TScintEdit.GetInsertMode: Boolean;
@@ -969,6 +1006,23 @@ begin
   Result.EndPos := Call(SCI_GETSELECTIONEND, 0, 0);
 end;
 
+function TScintEdit.GetSelectionAnchorPosition(Selection: Integer): Integer;
+begin
+  Result := Call(SCI_GETSELECTIONNANCHOR, Selection, 0);
+end;
+
+function TScintEdit.GetSelectionCaretPosition(Selection: Integer): Integer;
+begin
+  Result := Call(SCI_GETSELECTIONNCARET, Selection, 0);
+end;
+
+function TScintEdit.GetSelectionCount: Integer;
+{ Returns the number of selections currently active. Rectangular selections are
+  handled (and returned) as multiple selections, one for each line. }
+begin
+  Result := Call(SCI_GETSELECTIONS, 0, 0);
+end;
+
 function TScintEdit.GetSelText: String;
 begin
   Result := ConvertRawStringToString(GetRawSelText);
@@ -1021,11 +1075,9 @@ end;
 procedure TScintEdit.InitRawString(var S: TScintRawString; const Len: Integer);
 begin
   SetString(S, nil, Len);
-{$IFDEF UNICODE}
   //experimental, dont need this ATM:
   if FCodePage <> 0 then
     System.SetCodePage(RawByteString(S), FCodePage, False);
-{$ENDIF}
 end;
 
 function TScintEdit.IsPositionInViewVertically(const Pos: Integer): Boolean;
@@ -1086,6 +1138,8 @@ begin
       end;
     SCN_ZOOM:
       begin
+        if Assigned(FOnZoom) then
+          FOnZoom(Self);
         if FLineNumbers then
           UpdateLineNumbersWidth;
       end;
@@ -1123,6 +1177,14 @@ begin
   Call(SCI_REDO, 0, 0);
 end;
 
+procedure TScintEdit.RemoveAdditionalSelections;
+begin
+  var MainSel := MainSelection;
+  var CaretPos := SelectionCaretPosition[MainSel];
+  var AnchorPos := SelectionAnchorPosition[MainSel];
+  SetSingleSelection(CaretPos, AnchorPos);
+end;
+
 function TScintEdit.ReplaceRawTextRange(const StartPos, EndPos: Integer;
   const S: TScintRawString): TScintRange;
 begin
@@ -1156,12 +1218,16 @@ begin
   Call(SCI_SCROLLCARET, 0, 0);
 end;
 
-function TScintEdit.SelAvail: Boolean;
-var
-  Sel: TScintRange;
+function TScintEdit.SelNotEmpty: Boolean;
+begin
+  var Sel: TScintRange;
+  Result := SelNotEmpty(Sel);
+end;
+
+function TScintEdit.SelNotEmpty(out Sel: TScintRange): Boolean;
 begin
   Sel := GetSelection;
-  Result := (Sel.EndPos > Sel.StartPos);
+  Result := Sel.EndPos > Sel.StartPos;
 end;
 
 procedure TScintEdit.SelectAll;
@@ -1276,13 +1342,17 @@ begin
   SetWordChars(GetDefaultWordChars);
 end;
 
-procedure TScintEdit.SetEmptySelection;
-{ Clears all selections without scrolling the caret into view }
-var
-  Pos: Integer;
+procedure TScintEdit.SetEmptySelections;
+{ Makes all selections empty without scrolling the caret into view }
 begin
-  Pos := GetCaretPosition;
-  Call(SCI_SETSELECTION, Pos, Pos);
+  for var Selection := 0 to SelectionCount-1 do begin
+    var Pos := SelectionCaretPosition[Selection];
+    SelectionAnchorPosition[Selection] := Pos;
+  end;
+  { Workaround Scintilla bug which was fixed in
+    https://sourceforge.net/p/scintilla/code/ci/1bb3e86c576b0334ccbd7ac2fd69c4a48909e41f/ }
+  if Assigned(FOnUpdateUI) then
+    FOnUpdateUI(Self);
 end;
 
 procedure TScintEdit.SetFillSelectionToEdge(const Value: Boolean);
@@ -1313,6 +1383,11 @@ begin
     FLineNumbers := Value;
     UpdateLineNumbersWidth;
   end;
+end;
+
+procedure TScintEdit.SetMainSelection(const Value: Integer);
+begin
+  Call(SCI_SETMAINSELECTION, Value, 0);
 end;
 
 procedure TScintEdit.SetRawSelText(const Value: TScintRawString);
@@ -1352,9 +1427,39 @@ begin
   ChooseCaretX;
 end;
 
+procedure TScintEdit.SetSelectionAnchorPosition(Selection: Integer;
+  const AnchorPos: Integer);
+begin
+  Call(SCI_SETSELECTIONNANCHOR, Selection, AnchorPos);
+end;
+
+procedure TScintEdit.SetSelectionCaretPosition(Selection: Integer;
+  const CaretPos: Integer);
+begin
+  Call(SCI_SETSELECTIONNCARET, Selection, CaretPos);
+end;
+
 procedure TScintEdit.SetSelText(const Value: String);
 begin
   SetRawSelText(ConvertStringToRawString(Value));
+end;
+
+procedure TScintEdit.SetSingleSelection(const CaretPos, AnchorPos: Integer);
+{ Sets the main selection and removes additional selections without scrolling
+  the caret into view }
+begin
+  Call(SCI_SETSELECTION, CaretPos, AnchorPos);
+  { Scintilla should now send SCN_UPDATEUI with SC_UPDATE_SELECTION but doesn't,
+    not sure which commit fixes this (if any). It isn't
+    https://sourceforge.net/p/scintilla/code/ci/1bb3e86c576b0334ccbd7ac2fd69c4a48909e41f/
+    The test to see if its fixed:
+    -Open Debug.iss
+    -Rectangular block select (Alt+Drag) part of both MessagesFile parameters
+    -Hit Esc once
+    -Word at cursor highlighting should now be active again - without the
+     workaround below it isn't }
+  if Assigned(FOnUpdateUI) then
+    FOnUpdateUI(Self);
 end;
 
 procedure TScintEdit.SetStyler(const Value: TScintCustomStyler);
@@ -1707,12 +1812,14 @@ begin
   SetStyleAttr(STYLE_DEFAULT, DefaultAttr, True);
   Call(SCI_STYLECLEARALL, 0, 0);
 
-  if Assigned(FStyler) and FUseStyleAttributes then begin
-    for I := 0 to 31 do
-      SetStyleAttrFromStyler(I);
+  if Assigned(FStyler) then begin
+    if  FUseStyleAttributes then begin
+      for I := 0 to 31 do
+        SetStyleAttrFromStyler(I);
+      SetStyleAttrFromStyler(STYLE_BRACELIGHT);
+      SetStyleAttrFromStyler(STYLE_INDENTGUIDE);
+    end;
     SetStyleAttrFromStyler(STYLE_LINENUMBER);
-    SetStyleAttrFromStyler(STYLE_BRACELIGHT);
-    SetStyleAttrFromStyler(STYLE_INDENTGUIDE);
   end;
 
   if AutoCompleteFontName <> '' then
@@ -1727,13 +1834,16 @@ begin
 end;
 
 function TScintEdit.WordAtCursor: String;
-var
-  Pos, StartPos, EndPos: Integer;
 begin
-  Pos := GetCaretPosition;
-  StartPos := GetWordStartPosition(Pos, True);
-  EndPos := GetWordEndPosition(Pos, True);
-  Result := GetTextRange(StartPos, EndPos);
+  var Range := WordAtCursorRange;
+  Result := GetTextRange(Range.StartPos, Range.EndPos);
+end;
+
+function TScintEdit.WordAtCursorRange: TScintRange;
+begin
+  var Pos := GetCaretPosition;
+  Result.StartPos := GetWordStartPosition(Pos, True);
+  Result.EndPos := GetWordEndPosition(Pos, True);
 end;
 
 procedure TScintEdit.ZoomIn;
@@ -1835,7 +1945,7 @@ begin
     meaningful to the VCL -- but it doesn't restore the original value before
     passing an unhandled WM_MOUSEWHEEL message up to DefWndProc. This causes
     Scintilla to see Ctrl+wheel as Shift+wheel, breaking zoom. (Observed on
-    Delphi 2009.) }
+    Delphi 2009 and still needed in Delphi 11.3.) }
   Message.Result := CallWindowProc(DefWndProc, Handle, Message.Msg,
     Message.WParam, Message.LParam);
 end;
@@ -1868,13 +1978,6 @@ begin
   EndPos := FEdit.GetPositionFromLine(Index + 1);
   FEdit.ReplaceRawTextRange(StartPos, EndPos, '');
 end;
-
-{$IFNDEF UNICODE}
-class procedure TScintEditStrings.Error(Msg: PResStringRec; Data: Integer);
-begin
-  TList.Error(LoadResString(Msg), Data);
-end;
-{$ENDIF}
 
 function TScintEditStrings.Get(Index: Integer): String;
 begin
@@ -1995,7 +2098,7 @@ end;
 
 { TScintCustomStyler }
 
-procedure TScintCustomStyler.ApplyIndicators(const Indicators: TScintIndicatorNumbers;
+procedure TScintCustomStyler.ApplyStyleByteIndicators(const Indicators: TScintStyleByteIndicatorNumbers;
   StartIndex, EndIndex: Integer);
 var
   IndByte: Byte;
@@ -2042,7 +2145,7 @@ end;
 
 function TScintCustomStyler.ConsumeAllRemaining: Boolean;
 begin
-  Result := (FCurIndex <= FTextLen);
+  Result := FCurIndex <= FTextLen;
   if Result then
     FCurIndex := FTextLen + 1;
 end;
@@ -2111,7 +2214,7 @@ end;
 
 function TScintCustomStyler.GetEndOfLine: Boolean;
 begin
-  Result := (FCurIndex > FTextLen);
+  Result := FCurIndex > FTextLen;
 end;
 
 function TScintCustomStyler.LineTextSpans(const S: TScintRawString): Boolean;
@@ -2149,6 +2252,116 @@ procedure TScintCustomStyler.ResetCurIndexTo(Index: Integer);
 begin
   FCurIndex := Index;
   FStyleStartIndex := Index;
+end;
+
+{ TScintPixmap }
+
+const
+  XPMTransparentChar = ' ';
+  XPMTerminatorChar = '"';
+
+class constructor TScintPixmap.Create;
+begin
+  { Chars 128-255 are supported below but don't work in Scintilla }
+  for var C := #1 to #127 do
+    if (C <> XPMTransparentChar) and (C <> XPMTerminatorChar) then
+      ColorCodes := ColorCodes + C;
+end;
+
+function TScintPixmap.GetPixmap: Pointer;
+begin
+  Result := FPixmap;
+end;
+
+type
+  TRGBTripleArray = array[0..MaxInt div SizeOf(TRGBTriple) - 1] of TRGBTriple;
+  PRGBTripleArray = ^TRGBTripleArray;
+
+procedure TScintPixmap.InitializeFromBitmap(const ABitmap: TBitmap;
+  const TransparentColor: TColorRef);
+
+  procedure SetNextPixmapLine(const Pixmap: TPixmap; var Index: Integer; const Line: String);
+  begin
+    if Index > High(Pixmap) then
+      TScintEdit.Error('SetNextPixmapLine: Index out of range');
+
+    { Convert Line to an AnsiString, but copy the exact ordinal values;
+      i.e. don't do any translation of 128-255 }
+    var AnsiLine: AnsiString;
+    SetLength(AnsiLine, Length(Line));
+    for var I := 1 to Length(AnsiLine) do
+      AnsiLine[I] := AnsiChar(Ord(Line[I]));
+    Pixmap[Index] := AnsiLine;
+    Inc(Index);
+  end;
+
+begin
+  if ABitmap.PixelFormat <> pf24bit then
+    TScintEdit.Error('Invalid PixelFormat');
+
+  var Colors := TDictionary<Integer, TPair<Char, String>>.Create; { RGB -> Code & WebColor }
+  try
+    { Build colors list }
+    for var Y := 0 to ABitmap.Height-1 do begin
+      var Pixels: PRGBTripleArray := ABitmap.ScanLine[Y];
+      for var X := 0 to ABitmap.Width-1 do begin
+        var Color := RGB(Pixels[X].rgbtRed, Pixels[X].rgbtGreen, Pixels[X].rgbtBlue);
+        if (Color <> TransparentColor) and not Colors.ContainsKey(Color) then begin
+          var ColorCodeIndex := Colors.Count+1;
+          if ColorCodeIndex > Length(ColorCodes) then
+            TScintEdit.Error('Too many colors');
+          Colors.Add(Color, TPair<Char, String>.Create(ColorCodes[ColorCodeIndex], RGBToWebColorStr(Color)))
+        end;
+      end;
+    end;
+
+    { Build pixmap }
+    var Line: String;
+    SetLength(FPixmap, 0); { Not really needed but makes things clearer while debugging }
+    SetLength(FPixmap, 1 + Colors.Count + ABitmap.Height + 1);
+    Line := Format('%d %d %d 1', [ABitmap.Width, ABitmap.Height, Colors.Count]);
+    var Index := 0;
+    SetNextPixmapLine(FPixmap, Index, Line);
+    for var Color in Colors do begin
+      Line := Format('%s c %s', [Color.Value.Key, Color.Value.Value]);
+      SetNextPixmapLine(FPixmap, Index, Line);
+    end;
+    for var Y := 0 to ABitmap.Height-1 do begin
+      Line := '';
+      var Pixels: PRGBTripleArray := ABitmap.ScanLine[Y];
+      for var X := 0 to ABitmap.Width-1 do begin
+        var Color := RGB(Pixels[X].rgbtRed, Pixels[X].rgbtGreen, Pixels[X].rgbtBlue);
+        if Color = TransparentColor then
+          Line := Line + XPMTransparentChar
+        else
+          Line := Line + Colors[Color].Key;
+      end;
+      SetNextPixmapLine(FPixmap, Index, Line);
+    end;
+
+    { Add terminating nil pointer - Scintilla doesnt really need it but setting it anyway }
+    SetNextPixmapLine(FPixmap, Index, '');
+  finally
+    Colors.Free;
+  end;
+end;
+
+{ TScintRange }
+
+constructor TScintRange.Create(const AStartPos, AEndPos: Integer);
+begin
+  StartPos := AStartPos;
+  EndPos := AEndPos;
+end;
+
+function TScintRange.Overlaps(const ARange: TScintRange): Boolean;
+begin
+  Result := (StartPos <= ARange.EndPos) and (EndPos >= ARange.StartPos);
+end;
+
+function TScintRange.Within(const ARange: TScintRange): Boolean;
+begin
+  Result := (StartPos >= ARange.StartPos) and (EndPos <= ARange.EndPos);
 end;
 
 end.
