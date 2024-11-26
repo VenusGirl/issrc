@@ -10,29 +10,26 @@ program SetupLdr;
 }
 
 uses
-  SafeDLLPath in 'Src\SafeDLLPath.pas',
-  XPTheme in 'Src\XPTheme.pas',
+  SafeDLLPath in '..\Components\SafeDLLPath.pas',
+  SetupLdrAndSetup.XPTheme in 'Src\SetupLdrAndSetup.XPTheme.pas',
   Windows,
   Messages,
   SysUtils,
-  Compress in 'Src\Compress.pas',
-  LZMADecompSmall in 'Src\LZMADecompSmall.pas',
-  SetupEnt in 'Src\SetupEnt.pas',
+  Compression.Base in 'Src\Compression.Base.pas',
+  Compression.LZMA1SmallDecompressor in 'Src\Compression.LZMA1SmallDecompressor.pas',
+  Shared.SetupEntFunc in 'Src\Shared.SetupEntFunc.pas',
   PathFunc in '..\Components\PathFunc.pas',
-  CmnFunc2 in 'Src\CmnFunc2.pas',
-  Msgs in 'Src\Msgs.pas',
-  MsgIDs in 'Src\MsgIDs.pas',
-  Struct in 'Src\Struct.pas',
-  InstFunc in 'Src\InstFunc.pas',
-  FileClass in 'Src\FileClass.pas',
-  Int64Em in 'Src\Int64Em.pas',
-  SHA1 in 'Src\SHA1.pas',
-  MD5 in 'Src\MD5.pas',
-  RedirFunc in 'Src\RedirFunc.pas',
-  SetupTypes in 'Src\SetupTypes.pas',
-  VerInfo in 'Src\VerInfo.pas';
+  Shared.CommonFunc in 'Src\Shared.CommonFunc.pas',
+  SetupLdrAndSetup.Messages in 'Src\SetupLdrAndSetup.Messages.pas',
+  Shared.SetupMessageIDs in 'Src\Shared.SetupMessageIDs.pas',
+  Shared.Struct in 'Src\Shared.Struct.pas',
+  SetupLdrAndSetup.InstFunc in 'Src\SetupLdrAndSetup.InstFunc.pas',
+  Shared.FileClass in 'Src\Shared.FileClass.pas',
+  Shared.Int64Em in 'Src\Shared.Int64Em.pas',
+  SHA256 in '..\Components\SHA256.pas',
+  SetupLdrAndSetup.RedirFunc in 'Src\SetupLdrAndSetup.RedirFunc.pas',
+  Shared.VerInfoFunc in 'Src\Shared.VerInfoFunc.pas';
 
-{$SetPEFlags IMAGE_FILE_RELOCS_STRIPPED}
 {$SETPEOSVERSION 6.1}
 {$SETPESUBSYSVERSION 6.1}
 {$WEAKLINKRTTI ON}
@@ -311,7 +308,7 @@ begin
           '/HELP, /?' + SNewLine +
            'Shows this information.' + SNewLine +
           '/SP-' + SNewLine +
-          'Disables the This will install... Do you wish to continue? prompt at the beginning of Setup.' + SNewLine +
+          'Disables the "This will install... Do you wish to continue?" message box at the beginning of Setup.' + SNewLine +
           '/SILENT, /VERYSILENT' + SNewLine +
           'Instructs Setup to be silent or very silent.' + SNewLine +
           '/SUPPRESSMSGBOXES' + SNewLine +

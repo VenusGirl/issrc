@@ -1,7 +1,7 @@
 ; -- PowerShell.iss --
 ; Demonstrates calling Powershell at compile time and at run time.
-; At compile time it first generates a random password and then it shows it and copies it to the clipboard
-; At run time it shows the serial number of the system
+; At compile time it first generates a random password and then it shows it and copies it to the clipboard.
+; At run time it shows the serial number of the system.
 
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING .ISS SCRIPT FILES!
 
@@ -35,7 +35,7 @@ UninstallDisplayIcon={app}\MyProg.exe
 Compression=lzma2
 SolidCompression=yes
 OutputDir=userdocs:Inno Setup Examples Output
-Password=={#Password}
+Password={#Password}
 
 [Files]
 Source: "MyProg.exe"; DestDir: "{app}"
@@ -59,7 +59,11 @@ end;
 function ExecAndGetFirstLine(const Filename, Params, WorkingDir: String; var ResultCode: Integer): String;
 begin
   Line := '';
-  ExecAndLogOutput(Filename, Params, WorkingDir, SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode, @ExecAndGetFirstLineLog);
+  try
+    ExecAndLogOutput(Filename, Params, WorkingDir, SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode, @ExecAndGetFirstLineLog);
+  except
+    Log(GetExceptionMessage);
+  end;
   Result := Line;
 end;
 

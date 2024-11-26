@@ -12,22 +12,24 @@ program ISCC;
 
 {x$DEFINE STATICCOMPILER}
 { For debugging purposes, remove the 'x' to have it link the compiler code
-  into this program and not depend on ISCmplr.dll. }
+  into this program and not depend on ISCmplr.dll. You will also need to add the
+  ..\Components and Src folders to the Delphi Compiler Search path in the project
+  options. Also see IDE.MainForm's STATICCOMPILER and Compiler.Compile's STATICPREPROC. }
 
 uses
-  SafeDLLPath in 'Src\SafeDLLPath.pas',
+  SafeDLLPath in '..\Components\SafeDLLPath.pas',
   Windows,
   SysUtils,
   Classes,
-  {$IFDEF STATICCOMPILER} Compile in 'Src\Compile.pas', {$ENDIF}
+  {$IFDEF STATICCOMPILER} Compiler.Compile, {$ENDIF}
   PathFunc in '..\Components\PathFunc.pas',
-  CmnFunc2 in 'Src\CmnFunc2.pas',
-  CompInt in 'Src\CompInt.pas',
-  FileClass in 'Src\FileClass.pas',
-  CompTypes in 'Src\CompTypes.pas',
-  Int64Em in 'Src\Int64Em.pas';
+  Shared.CommonFunc in 'Src\Shared.CommonFunc.pas',
+  Shared.CompilerInt in 'Src\Shared.CompilerInt.pas',
+  Shared.FileClass in 'Src\Shared.FileClass.pas',
+  Shared.ConfigIniFile in 'Src\Shared.ConfigIniFile.pas',
+  Shared.SignToolsFunc in 'Src\Shared.SignToolsFunc.pas',
+  Shared.Int64Em in 'Src\Shared.Int64Em.pas';
 
-{$SetPEFlags IMAGE_FILE_RELOCS_STRIPPED}
 {$SETPEOSVERSION 6.1}
 {$SETPESUBSYSVERSION 6.1}
 {$WEAKLINKRTTI ON}
@@ -393,8 +395,9 @@ procedure ProcessCommandLine;
     WriteStdErr('Options:');
     WriteStdErr('  /O(+|-)            Enable or disable output (overrides Output)');
     WriteStdErr('  /O<path>           Output files to specified path (overrides OutputDir)');
-    WriteStdErr('  /F<filename>       Overrides OutputBaseFilename with the specified filename');
+    WriteStdErr('  /F<filename>       Specifies an output filename (overrides OutputBaseFilename)');
     WriteStdErr('  /S<name>=<command> Sets a SignTool with the specified name and command');
+    WriteStdErr('                     (Any Sign Tools configured using the Compiler IDE will be specified automatically)');
     WriteStdErr('  /Q                 Quiet compile (print error messages only)');
     WriteStdErr('  /Qp                Enable quiet compile while still displaying progress');
     if IsppMode then begin
@@ -408,9 +411,11 @@ procedure ProcessCommandLine;
       WriteStdErr('  /V<number>         Emulate #pragma verboselevel <number>');
     end;
     WriteStdErr('  /?                 Show this help screen');
+    WriteStdErr('');
+    WriteStdErr('Examples: iscc "c:\isetup\samples\my script.iss"');
+    WriteStdErr('          iscc /Qp /O"My Output" /F"MyProgram-1.0" /Sbyparam=$p "c:\isetup\samples\my script.iss"');
     if IsppMode then begin
-      WriteStdErr('');
-      WriteStdErr('Example: iscc /$c- /Pu+ "/DLic=Trial Lic.txt" /IC:\INC;D:\INC scriptfile.iss');
+      WriteStdErr('          iscc /$c- /Pu+ "/DLic=Trial Lic.txt" /IC:\INC;D:\INC scriptfile.iss');
       WriteStdErr('');
     end;
   end;

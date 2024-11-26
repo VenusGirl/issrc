@@ -10,58 +10,65 @@ program Compil32;
 }
 
 uses
-  SafeDLLPath in 'Src\SafeDLLPath.pas',
+  SafeDLLPath in '..\Components\SafeDLLPath.pas',
   Windows,
   SysUtils,
   Forms,
   PathFunc in '..\Components\PathFunc.pas',
-  CompForm in 'Src\CompForm.pas' {CompileForm},
-  CmnFunc in 'Src\CmnFunc.pas',
-  CmnFunc2 in 'Src\CmnFunc2.pas',
-  CompFunc in 'Src\CompFunc.pas',
-  CompMsgs in 'Src\CompMsgs.pas',
-  CompInt in 'Src\CompInt.pas',
-  CompOptions in 'Src\CompOptions.pas' {OptionsForm},
-  CompStartup in 'Src\CompStartup.pas' {StartupForm},
-  CompWizard in 'Src\CompWizard.pas' {WizardForm},
-  CompWizardFile in 'Src\CompWizardFile.pas' {WizardFileForm},
-  CompFileAssoc in 'Src\CompFileAssoc.pas',
-  TmSchema in '..\Components\TmSchema.pas',
+  IDE.MainForm in 'Src\IDE.MainForm.pas' {MainForm},
+  Shared.CommonFunc.Vcl in 'Src\Shared.CommonFunc.Vcl.pas',
+  Shared.CommonFunc in 'Src\Shared.CommonFunc.pas',
+  IDE.HelperFunc in 'Src\IDE.HelperFunc.pas',
+  IDE.Messages in 'Src\IDE.Messages.pas',
+  Shared.CompilerInt in 'Src\Shared.CompilerInt.pas',
+  IDE.OptionsForm in 'Src\IDE.OptionsForm.pas' {OptionsForm},
+  IDE.StartupForm in 'Src\IDE.StartupForm.pas' {StartupForm},
+  IDE.Wizard.WizardForm in 'Src\IDE.Wizard.WizardForm.pas' {WizardForm},
+  IDE.Wizard.WizardFileForm in 'Src\IDE.Wizard.WizardFileForm.pas' {WizardFileForm},
+  IDE.FileAssocFunc in 'Src\IDE.FileAssocFunc.pas',
+  NewUxTheme.TmSchema in '..\Components\NewUxTheme.TmSchema.pas',
   NewUxTheme in '..\Components\NewUxTheme.pas',
-  DebugStruct in 'Src\DebugStruct.pas',
-  BrowseFunc in 'Src\BrowseFunc.pas',
-  CompSignTools in 'Src\CompSignTools.pas' {SignToolsForm},
-  CompInputQueryCombo in 'Src\CompInputQueryCombo.pas',
+  Shared.DebugStruct in 'Src\Shared.DebugStruct.pas',
+  BrowseFunc in '..\Components\BrowseFunc.pas',
+  IDE.SignToolsForm in 'Src\IDE.SignToolsForm.pas' {SignToolsForm},
+  IDE.InputQueryComboForm in 'Src\IDE.InputQueryComboForm.pas',
+  IDE.InputQueryMemoForm in 'Src\IDE.InputQueryMemoForm.pas',
   ScintInt in '..\Components\ScintInt.pas',
   ScintEdit in '..\Components\ScintEdit.pas',
-  ScintStylerInnoSetup in '..\Components\ScintStylerInnoSetup.pas',
+  IDE.ScintStylerInnoSetup in 'Src\IDE.ScintStylerInnoSetup.pas',
   ModernColors in '..\Components\ModernColors.pas',
-  CompMsgBoxDesigner in 'Src\CompMsgBoxDesigner.pas' {MsgBoxDesignerForm},
-  CompScintEdit in 'Src\CompScintEdit.pas',
-  CompFilesDesigner in 'Src\CompFilesDesigner.pas' {FilesDesignerForm},
-  CompWizardFilesHelper in 'Src\CompWizardFilesHelper.pas',
+  IDE.MsgBoxDesignerForm in 'Src\IDE.MsgBoxDesignerForm.pas' {MsgBoxDesignerForm},
+  IDE.IDEScintEdit in 'Src\IDE.IDEScintEdit.pas',
+  IDE.FilesDesignerForm in 'Src\IDE.FilesDesignerForm.pas' {FilesDesignerForm},
+  IDE.Wizard.WizardFormFilesHelper in 'Src\IDE.Wizard.WizardFormFilesHelper.pas',
   NewTabSet in '..\Components\NewTabSet.pas',
   NewStaticText in '..\Components\NewStaticText.pas',
   BidiUtils in '..\Components\BidiUtils.pas',
   DropListBox in '..\Components\DropListBox.pas',
   NewCheckListBox in '..\Components\NewCheckListBox.pas',
   NewNotebook in '..\Components\NewNotebook.pas',
-  TaskbarProgressFunc in 'Src\TaskbarProgressFunc.pas',
-  HtmlHelpFunc in 'Src\HtmlHelpFunc.pas',
-  UIStateForm in 'Src\UIStateForm.pas',
-  LangOptionsSectionDirectives in 'Src\LangOptionsSectionDirectives.pas',
-  MsgIDs in 'Src\MsgIDs.pas',
-  SetupSectionDirectives in 'Src\SetupSectionDirectives.pas',
-  CompTypes in 'Src\CompTypes.pas',
-  FileClass in 'Src\FileClass.pas',
-  Int64Em in 'Src\Int64Em.pas',
-  Compress in 'Src\Compress.pas',
-  TaskDialog in 'Src\TaskDialog.pas',
-  CompRegistryDesigner in 'Src\CompRegistryDesigner.pas' {RegistryDesignerForm},
-  CompWizardRegistryHelper in 'Src\CompWizardRegistryHelper.pas',
-  MD5 in 'Src\MD5.pas';
+  TaskbarProgressFunc in '..\Components\TaskbarProgressFunc.pas',
+  IDE.HtmlHelpFunc in 'Src\IDE.HtmlHelpFunc.pas',
+  UIStateForm in '..\Components\UIStateForm.pas',
+  Shared.LangOptionsSectionDirectives in 'Src\Shared.LangOptionsSectionDirectives.pas',
+  Shared.SetupMessageIDs in 'Src\Shared.SetupMessageIDs.pas',
+  Shared.SetupSectionDirectives in 'Src\Shared.SetupSectionDirectives.pas',
+  Shared.ConfigIniFile in 'Src\Shared.ConfigIniFile.pas',
+  Shared.SignToolsFunc in 'Src\Shared.SignToolsFunc.pas',
+  Shared.FileClass in 'Src\Shared.FileClass.pas',
+  Shared.Int64Em in 'Src\Shared.Int64Em.pas',
+  Shared.TaskDialogFunc in 'Src\Shared.TaskDialogFunc.pas',
+  IDE.RegistryDesignerForm in 'Src\IDE.RegistryDesignerForm.pas' {RegistryDesignerForm},
+  IDE.Wizard.WizardFormRegistryHelper in 'Src\IDE.Wizard.WizardFormRegistryHelper.pas',
+  ScintInt.InnoSetup in '..\Components\ScintInt.InnoSetup.pas',
+  Shared.ScriptFunc in 'Src\Shared.ScriptFunc.pas',
+  Shared.SetupSteps in 'Src\Shared.SetupSteps.pas',
+  Shared.Struct in 'Src\Shared.Struct.pas',
+  SHA256 in '..\Components\SHA256.pas',
+  Shared.DotNetVersion in 'Src\Shared.DotNetVersion.pas',
+  isxclasses_wordlists_generated in '..\ISHelp\isxclasses_wordlists_generated.pas',
+  IDE.ImagesModule in 'Src\IDE.ImagesModule.pas' {ImagesModule: TDataModule};
 
-{$SetPEFlags IMAGE_FILE_RELOCS_STRIPPED}
 {$SETPEOSVERSION 6.1}
 {$SETPESUBSYSVERSION 6.1}
 {$WEAKLINKRTTI ON}
@@ -120,7 +127,7 @@ begin
 end;
 
 procedure CreateMutexes;
-{ Creates the two mutexes used by the Inno Setup's own installer/uninstaller to
+{ Creates the two mutexes used by Inno Setup's own installer/uninstaller to
   see if the compiler is still running.
   One of the mutexes is created in the global name space (which makes it
   possible to access the mutex across user sessions in Windows XP); the other
@@ -193,6 +200,10 @@ begin
 end;
 
 begin
+  {$IFDEF DEBUG}
+  ReportMemoryLeaksOnShutdown := True;
+  {$ENDIF}
+
   InitialCurDir := GetCurrentDir;
   if not SetCurrentDir(PathExtractDir(NewParamStr(0))) then
     SetCurrentDir(GetSystemDir);
@@ -211,6 +222,7 @@ begin
       Title := SCompilerFormCaption;
   end;
 
-  Application.CreateForm(TCompileForm, CompileForm);
+  Application.CreateForm(TImagesModule, ImagesModule);
+  Application.CreateForm(TMainForm, MainForm);
   Application.Run;
 end.

@@ -15,8 +15,8 @@ Getting Started
     First you need to download the sources from Github. From the command line do:
 
     ```
-    > git clone https://github.com/jrsoftware/issrc.git is
-    > cd is
+    > git clone https://github.com/jrsoftware/issrc.git issrc
+    > cd issrc
     > git submodule init
     > git submodule update
     ```
@@ -40,12 +40,6 @@ Getting Started
 
    We compile all of Inno Setup's projects under Delphi 11.3 Alexandria.
 
-   If you do not have access to this version of Delphi, you should be
-   able to compile the projects on other versions, however complete
-   compatibility is NOT guaranteed. We try to make Inno Setup compilable on
-   the other versions when possible, but do not have the resources to test
-   every change on every Delphi version.
-  
    There's a free version of Delphi available called the Community Edition.
    See https://www.embarcadero.com/products/delphi/starter/free-download.
 
@@ -56,7 +50,7 @@ Getting Started
    http://web.archive.org/web/20160201063255/http://download.microsoft.com/download/0/A/9/0A939EF6-E31C-430F-A3DF-DFAE7960D564/htmlhelp.exe
 
    Note: Microsoft HTML Help Workshop is only needed to be able to compile the
-   help files.
+   help file.
 
 
 4. **Build Inno Setup**
@@ -77,11 +71,6 @@ Getting Started
    To just compile the Inno Setup help file and its web version run
    **ISHelp\ISHelpGen\compile.bat** and **ISHelp\compile.bat** and follow the
    instructions. The former batch file cannot be used with the
-   Community Edition, open Projects\Projects.groupproj instead.
-
-   To just compile the Inno Setup Preprocessor help file and its web version run
-   **ISHelp\ISHelpGen\compile.bat** and **Projects\Ispp\Help\compile.bat** and
-   follow the instructions. The former batch file cannot be used with the
    Community Edition, open Projects\Projects.groupproj instead.
 
 
@@ -108,31 +97,37 @@ additionally install the following components.
 - DropListBox
 - NewTabSet
 
-The [Components] directory contains a Components project which you can use to
+The [Components] directory contains a Components.dpk file which you can use to
 install all these components.
 
 If you only want to edit code, then you may skip installation of the
 components, and choose "Cancel" if the Delphi IDE tells you a class can't
 be found.
 
+The [Components] directory also includes various units that are not
+installable components; however, they are still considered components
+because they can function independently from Inno Setup.
 
 Overview
 --------
 
 Inno Setup consists of six projects:
 
-**Compil32** - This is the GUI front-end for the compiler. Compil32 does not
-do the actual compilation itself; it relegates it to ISCmplr.dll. If the
-ISCmplr project is changed, you normally don't need to recompile Compil32
-since it's essentially a text editor, and is not affected by internal
-changes to the compiler.
+**Compil32** - This is the GUI front-end for the compiler, also known as
+the Compiler IDE. Compil32 does not do the actual compilation itself; it
+relegates it to ISCmplr.dll. If the ISCmplr project is changed, you
+normally don't need to recompile Compil32 since it's essentially a text
+editor, and is not affected by internal changes to the compiler.
 
 **ISCC** - This is the command-line front-end to the compiler. Like
 Compil32, it depends on ISCmplr.dll to do the actual compiling.
 
 **ISCmplr** - This is a DLL which is loaded by Compil32 and ISCC to compile
-scripts. The actual compiler code is in Compile.pas. See CompInt.pas for the
-various structures and function declarations used to interface to the DLL.
+scripts. The actual compiler code is in Compiler.SetupCompiler.pas. See
+Shared.CompInt.pas for the various structures and function declarations used
+to interface to the DLL.
+
+**ISPP** - This is a DLL implementing Inno Setup's preprocessor interface.
 
 **Setup** - This is the actual "Setup" program. It displays the wizard, and
 performs all (un)installation-related tasks.
@@ -141,22 +136,16 @@ performs all (un)installation-related tasks.
 Setup program into the user's TEMP directory and runs it from there. It also
 displays the "This will install..." and /HELP message boxes.
 
-**ISPP\ISPP** - This is a DLL implementing Inno Setup's preprocessor interface.
-
 How do the projects link together?
 
-- ISCmplr, ISPP, Setup, and SetupLdr share the unit Struct.pas. This unit
-  contains various data structures and constants shared by the projects. If
-  Struct.pas is changed, you usually will need to recompile ISCmplr, ISPP,
-  Setup, and SetupLdr so that everything is in synch.
+- Compil32, ISCmplr, ISPP, Setup, and SetupLdr share the unit Shared.Struct.pas.
+  This unit contains various data structures and constants shared by the projects.
+  If Shared.Struct.pas is changed, you usually will need to recompile all these
+  projects so that everything is in synch.
 
 - There are more units which are shared between projects. Search the .dpr
   files of the projects if you aren't sure if a project uses a particular
   unit.
-
-- The ISPP help file uses various copies of other Inno Setup files. To synch
-  these run **ISPP\Help\synch-isfiles.bat**.
-
 
 Source code tips
 ----------------
@@ -173,7 +162,7 @@ Source code tips
   
 - When building the projects in Release mode it outputs to [Files].
   
-- All of the forms in the Setup project, with the exception of Main.dfm, have
+- All of the forms in the Setup project, with the exception of Setup.MainForm.dfm, have
   Scaled set to False. This is because they dynamically scale themselves at
   run-time by calling a function named InitializeFont.
 
@@ -203,19 +192,23 @@ from the bzlib directory in the iscompress repository.
 from the zlib-dll directory in the iscompress repository.
 
 **Files\islzma.dll**, **Files\islzma32.exe**, **Files\islzma64.exe** - Compiled
-by Visual Studio 2005 from the [Projects\Src\Lzma2\Encoder] directory.
+by Visual Studio 2022 from the [Projects\Src\Compression.LZMACompressor\islzma] directory.
 
-**Files\isscint.dll** - Compiled by Visual Studio 2005 from Scintilla source
+**Files\isscint.dll** - Compiled by Visual Studio 2022 from Scintilla source
 code in the isscint repository.
 
-**Projects\Helper\x64\Release\Helper.exe**, **Projects\Src\HelperEXEs.res** -
-Compiled by Visual Studio 2005 from the [Projects\Helper] directory and then
+**Projects\Src\Setup.HelperEXEs\Helper\x64\Release\Helper.exe**, **Projects\Src\Setup.HelperEXEs.res** -
+Compiled by Visual Studio 2005 from the [Projects\Src\Setup.HelperEXEs\Helper] directory and then
 stored in a compiled resource file.
 
-**Projects\Src\LzmaDecode\LzmaDecodeInno.obj** - See [Projects\Src\LzmaDecode\compiling.txt].
+**Projects\Src\Compression.LZMADecompressor\Lzma2Decode\ISLzmaDec.obj** -
+Compiled by Visual Studio 2022 from the [Projects\Src\Compression.LZMADecompressor\Lzma2Decode] directory.
 
-**Projects\Src\Lzma2\Decoder\ISLzmaDec.obj**, **Projects\Src\Lzma2\Decoder\ISLzma2Dec.obj** -
-See [Projects\Src\Lzma2\Decoder\compiling.txt].
+**Projects\Src\Compression.LZMA1SmallDecompressor\LzmaDecode\LzmaDecodeInno.obj** -
+Compiled by Visual Studio 2022 from the [Projects\Src\Compression.LZMA1SmallDecompressor\LzmaDecode] directory.
+
+**Projects\Src\Compression.SevenZipDecoder\7zDecode\IS7zDec.obj** -
+Compiled by Visual Studio 2022 from the [Projects\Src\Compression.SevenZipDecoder\7zDecode] directory.
 
 **Examples\MyProg.exe**, **Examples\MyProg-x64.exe**, **Examples\MyProg-Arm64.exe** -
 Compiled by Visual Studio 2022 from the [Examples\MyProg] directory.
@@ -224,7 +217,7 @@ Inno Setup-specific editing guidelines for the help files
 ---------------------------------------------------------
 
 - When mentioning something the user would type in a script, e.g. "MinVersion",
-  surround it by `<tt></tt>` so that it's displayed in the Courier New font. This is
+  surround it by `<tt></tt>` so that it's displayed in a monospaced font. This is
   a convention used throughout the help file. Example: `<tt>MinVersion</tt>`
 
 Setting up Continuous Integration
@@ -273,10 +266,13 @@ workflow will be triggered automatically.
 [Projects\Bin]: <Projects/Bin>
 [Components]: <Components>
 [Files]: <Files>
-[Projects\Src\Lzma2\Encoder]: <Projects/Src/Lzma2/Encoder>
-[Projects\Helper]: <Projects/Helper>
+[Projects\Src\Compression.LZMACompressor\islzma]: <Projects/Src/Compression.LZMACompressor/islzma>
+[Projects\Src\Setup.HelperEXEs\Helper]: <Projects/Src/Setup.HelperEXEs/Helper>
 [Examples\MyProg]: <Examples/MyProg>
-[Projects\Src\LzmaDecode\compiling.txt]: <Projects/Src/LzmaDecode/compiling.txt>
-[Projects\Src\Lzma2\Decoder\compiling.txt]: <Projects/Src/Lzma2/Decoder/compiling.txt>
+[Projects\Src]: <Projects/Src>
+[Projects\Src\Compil32]: <Projects/Src/Compil32>
+[Projects\Src\Compression.LZMADecompressor\Lzma2Decode]: <Projects/Src/Compression.LZMADecompressor/Lzma2Decode>
+[Projects\Src\Compression.LZMA1SmallDecompressor\LzmaDecode]: <Projects/Src/Compression.LZMA1SmallDecompressor/LzmaDecode>
+[Projects\Src\Compression.SevenZipDecoder\7zDecode]: <Projects/Src/Compression.SevenZipDecoder/7zDecode>
 [7-Zip]: https://www.7-zip.org/
 [secret]: https://docs.github.com/en/actions/security-guides/encrypted-secrets

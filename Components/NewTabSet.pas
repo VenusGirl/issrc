@@ -35,7 +35,8 @@ type
     FTheme: TTheme;
     FThemeDark: Boolean;
     FHotIndex: Integer;
-    function GetTabRect(Index: Integer): TRect;
+    procedure EnsureCurrentTabIsFullyVisible;
+    function GetTabRect(const Index: Integer; const ApplyTabsOffset: Boolean = True): TRect;
     function GetCloseButtonRect(const TabRect: TRect): TRect;
     procedure InvalidateTab(Index: Integer);
     procedure CloseButtonsListChanged(Sender: TObject; const Item: Boolean;
@@ -48,8 +49,8 @@ type
     procedure SetTabPosition(Value: TTabPosition);
     procedure SetTheme(Value: TTheme);
     procedure SetHints(const Value: TStrings);
+    function ToCurrentPPI(const XY: Integer): Integer;
     procedure UpdateThemeData(const Open: Boolean);
-    procedure EnsureCurrentTabIsFullyVisible;
   protected
     procedure CMHintShow(var Message: TCMHintShow); message CM_HINTSHOW;
     procedure WMMouseMove(var Message: TWMMouseMove); message WM_MOUSEMOVE;
@@ -60,6 +61,7 @@ type
     procedure UpdateHotIndex(NewHotIndex: Integer);
     procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
     procedure Paint; override;
+    procedure Resize; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -161,9 +163,9 @@ end;
 { TNewTabSet }
 
 const
+  TabSetMarginX = 4;
   TabPaddingX = 5;
   TabPaddingY = 3;
-  TabSpacing = 1;
   CloseButtonSizeX = 12;
 
 constructor TNewTabSet.Create(AOwner: TComponent);
@@ -198,7 +200,9 @@ end;
 destructor TNewTabSet.Destroy;
 begin
   UpdateThemeData(False);
+  FHints.Free;
   FTabs.Free;
+  FCloseButtons.Free;
   inherited;
 end;
 
@@ -247,7 +251,36 @@ begin
   inherited;
 end;
 
-function TNewTabSet.GetTabRect(Index: Integer): TRect;
+procedure TNewTabSet.EnsureCurrentTabIsFullyVisible;
+begin
+  const AdjacentTabVisiblePixels = ToCurrentPPI(30);
+  const CR = ClientRect;
+  const R = GetTabRect(FTabIndex, False);
+  var Offset := FTabsOffset;
+
+  { If the tab is overflowing to the right, scroll right }
+  var Overflow := R.Right - Offset - CR.Right + AdjacentTabVisiblePixels;
+  if Overflow > 0 then
+    Inc(Offset, Overflow);
+
+  { If there's extra space after the last tab, scroll left if possible }
+  const LastTabRight = GetTabRect(FTabs.Count-1, False).Right +
+    ToCurrentPPI(TabSetMarginX);
+  Offset := Min(Offset, Max(0, LastTabRight - CR.Right));
+
+  { If the tab is overflowing to the left, scroll left }
+  Overflow := Offset - R.Left + AdjacentTabVisiblePixels;
+  if Overflow > 0 then
+    Offset := Max(0, Offset - Overflow);
+
+  if FTabsOffset <> Offset then begin
+    FTabsOffset := Offset;
+    Invalidate;
+  end;
+end;
+
+function TNewTabSet.GetTabRect(const Index: Integer;
+  const ApplyTabsOffset: Boolean = True): TRect;
 var
   CR: TRect;
   I, SizeX, SizeY: Integer;
@@ -257,13 +290,15 @@ begin
   Canvas.Font.Assign(Font);
   if FTabPosition = tpBottom then
     Result.Top := 0;
-  Result.Right := 4 - FTabsOffset;
+  Result.Right := ToCurrentPPI(TabSetMarginX);
+  if ApplyTabsOffset then
+    Dec(Result.Right, FTabsOffset);
   for I := 0 to FTabs.Count-1 do begin
     Size := Canvas.TextExtent(FTabs[I]);
-    SizeX := Size.cx + (TabPaddingX * 2) + TabSpacing;
+    SizeX := Size.cx + (ToCurrentPPI(TabPaddingX) * 2);
     if (I < FCloseButtons.Count) and FCloseButtons[I] then
-      Inc(SizeX, MulDiv(CloseButtonSizeX, CurrentPPI, 96));
-    SizeY := Size.cy + (TabPaddingY * 2);
+      Inc(SizeX, ToCurrentPPI(CloseButtonSizeX));
+    SizeY := Size.cy + (ToCurrentPPI(TabPaddingY) * 2);
     if FTabPosition = tpTop then
       Result.Top := CR.Bottom - SizeY;
     Result := Bounds(Result.Right, Result.Top, SizeX, SizeY);
@@ -275,8 +310,8 @@ end;
 
 function TNewTabSet.GetCloseButtonRect(const TabRect: TRect): TRect;
 begin
-  Result := TRect.Create(TabRect.Right - MulDiv(CloseButtonSizeX, CurrentPPI, 96) - TabPaddingX div 2,
-    TabRect.Top, TabRect.Right - TabPaddingX div 2, TabRect.Bottom);
+  Result := TRect.Create(TabRect.Right - ToCurrentPPI(CloseButtonSizeX) - ToCurrentPPI(TabPaddingX) div 2,
+    TabRect.Top, TabRect.Right - ToCurrentPPI(TabPaddingX) div 2, TabRect.Bottom);
 end;
 
 procedure TNewTabSet.InvalidateTab(Index: Integer);
@@ -285,9 +320,6 @@ var
 begin
   if HandleAllocated and (Index >= 0) and (Index < FTabs.Count) then begin
     R := GetTabRect(Index);
-    { Inc R.Right since the trailing separator of a tab overwrites the first
-      pixel of the next tab }
-    Inc(R.Right);
     InvalidateRect(Handle, @R, False);
   end;
 end;
@@ -365,12 +397,12 @@ var
    if (TabIndex < FCloseButtons.Count) and FCloseButtons[TabIndex] then begin
       var R := GetCloseButtonRect(TabRect);
       if FMenuThemeData <> 0 then begin
-        var Offset := MulDiv(1, CurrentPPI, 96);
+        var Offset := ToCurrentPPI(1);
         Inc(R.Left, Offset);
         Inc(R.Top, Offset);
         DrawThemeBackground(FMenuThemeData, Canvas.Handle, MENU_SYSTEMCLOSE, MSYSC_NORMAL, R, nil);
       end else begin
-        InflateRect(R, -MulDiv(3, CurrentPPI, 96), -MulDiv(6, CurrentPPI, 96));
+        InflateRect(R, -ToCurrentPPI(3), -ToCurrentPPI(6));
         Canvas.Pen.Color := Canvas.Font.Color;
         Canvas.MoveTo(R.Left, R.Top);
         Canvas.LineTo(R.Right, R.Bottom);
@@ -388,7 +420,6 @@ var
     for I := 0 to FTabs.Count-1 do begin
       R := GetTabRect(I);
       if SelectedTab and (FTabIndex = I) then begin
-        Dec(R.Right, TabSpacing);
         if FTheme <> nil then
           Canvas.Brush.Color := FTheme.Colors[tcBack]
         else
@@ -399,7 +430,7 @@ var
           Canvas.Font.Color := FTheme.Colors[tcFore]
         else
           Canvas.Font.Color := clBtnText;
-        Canvas.TextOut(R.Left + TabPaddingX, R.Top + TabPaddingY, FTabs[I]);
+        Canvas.TextOut(R.Left + ToCurrentPPI(TabPaddingX), R.Top + ToCurrentPPI(TabPaddingY), FTabs[I]);
         DrawCloseButton(R, I);
         ExcludeClipRect(Canvas.Handle, R.Left, R.Top, R.Right, R.Bottom);
         Break;
@@ -419,7 +450,7 @@ var
             use plain clBtnHighlight as the text color }
           Canvas.Font.Color := clBtnHighlight;
         end;
-        Canvas.TextOut(R.Left + TabPaddingX, R.Top + TabPaddingY, FTabs[I]);
+        Canvas.TextOut(R.Left + ToCurrentPPI(TabPaddingX), R.Top + ToCurrentPPI(TabPaddingY), FTabs[I]);
         if FHotIndex = I then
           DrawCloseButton(R, I);
       end;
@@ -476,6 +507,12 @@ begin
   DrawTabs(False);
 end;
 
+procedure TNewTabSet.Resize;
+begin
+  EnsureCurrentTabIsFullyVisible;
+  inherited;
+end;
+
 procedure TNewTabSet.SetCloseButtons(Value: TBoolList);
 begin
   FCloseButtons.Clear;
@@ -526,6 +563,11 @@ begin
   end;
 end;
 
+function TNewTabSet.ToCurrentPPI(const XY: Integer): Integer;
+begin
+  Result := MulDiv(XY, CurrentPPI, 96);
+end;
+
 procedure TNewTabSet.UpdateThemeData(const Open: Boolean);
 begin
   if FMenuThemeData <> 0 then begin
@@ -540,34 +582,5 @@ begin
       FMenuThemeData := OpenThemeData(Handle, 'Menu');
   end;
 end;
-
-procedure TNewTabSet.EnsureCurrentTabIsFullyVisible;
-var
-  rcTab, rcCtl, rcLast: TRect;
-  iExtra, iDelta, iNewOffset: Integer;
-begin
-  rcCtl := ClientRect;
-  rcTab := GetTabRect(FTabIndex);
-
-  { Check and modify tabs offset so everything fits }
-  iExtra := Min(rcCtl.Width div 2, rcTab.Width * 4);  { arbitrary value, adjust as needed }
-  iDelta := rcTab.Width div 2;                        { arbitrary value, adjust as needed }
-
-  { Left side is easy, limit is always 0 }
-  if rcTab.Left < rcCtl.Left + iDelta then begin
-    FTabsOffset := Max(0, FTabsOffset - rcCtl.Left - rcTab.Left - iExtra);
-    Invalidate;
-  end;
-
-  { Right side limit depends on last tab and total available space }
-  if rcTab.Right > rcCtl.Right - iDelta then begin
-    iNewOffset := FTabsOffset + (rcTab.Right - rcCtl.Right) + iExtra;
-    FTabsOffset := 0; { We need the last tabs leftmost position w/o any offset }
-    rcLast := GetTabRect(FTabs.Count-1);
-    FTabsOffset := Max(0, Min(iNewOffset, rcLast.Right - rcCtl.Width + 10));
-    Invalidate;
-  end;
-end;
-
 
 end.

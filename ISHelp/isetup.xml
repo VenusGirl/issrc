@@ -54,7 +54,20 @@
     <contentstopic title="Using Custom Wizard Pages" topic="scriptpages" />
     <contentstopic title="Using DLLs and .NET assemblies" topic="scriptdll" />
     <contentstopic title="Using COM Automation objects" topic="scriptautomation" />
-    <contentstopic title="Debugging" topic="scriptdebug" />
+    <contentstopic title="Run-time debugger" topic="scriptdebug" />
+  </contentsheading>
+  <contentsheading title="Inno Setup Preprocessor">
+    <contentstopic title="Introduction" topic="isppoverview" />
+    <contentstopic title="Directives Reference" topic="directives" />
+    <contentstopic title="Support Functions Reference" topic="funcs" />
+    <contentstopic title="User Defined Functions" topic="macros" />
+    <contentstopic title="Expression Syntax" topic="expressions" />
+    <contentstopic title="Predefined Variables" topic="predefinedvars" />
+    <contentstopic title="Line Spanning" topic="linespan" />
+    <contentstopic title="Visibility of Identifiers" topic="visibility" />
+    <contentstopic title="Example Script" topic="example" />
+    <contentstopic title="ISPPBuiltins.iss" topic="builtinsiss" />
+    <contentstopic title="Extended Command Line Compiler" topic="isppcc" />
   </contentsheading>
   <contentsheading title="Other Information">
     <contentstopic title="Support Inno Setup" topic="donate" />
@@ -71,7 +84,8 @@
     <contentstopic title="Uninstaller Command Line Parameters" topic="uninstcmdline" />
     <contentstopic title="Setup Exit Codes" topic="setupexitcodes" />
     <contentstopic title="Uninstaller Exit Codes" topic="uninstexitcodes" />
-    <contentstopic title="Compiler IDE Keyboard Commands" topic="compformshortcuts" />
+    <contentstopic title="Compiler IDE Keyboard And Mouse Commands" topic="compformshortcuts" />
+    <contentstopic title="Compiler IDE Regular Expressions" topic="compformregex" />
     <contentstopic title="Miscellaneous Notes" topic="technotes" />
     <contentstopic title="Example Scripts" topic="examples" />
     <contentstopic title="Frequently Asked Questions" topic="faq" />
@@ -88,7 +102,7 @@
 <body>
 
 <p>
-<b>Inno Setup version 6.3.0</b><br/>
+<b>Inno Setup version 6.4.0-dev</b><br/>
 <b>Copyright &copy; 1997-2024 Jordan Russell. All rights reserved.</b><br/>
 <b>Portions Copyright &copy; 2000-2024 Martijn Laan. All rights reserved.</b><br/>
 <extlink href="https://jrsoftware.org/">Inno Setup home page</extlink>
@@ -141,7 +155,7 @@ Includes integrated support for "deflate", bzip2, and 7-Zip LZMA/LZMA2 file <lin
 
 <li>Full source code is available from <extlink href="https://github.com/jrsoftware/issrc">GitHub</extlink>.</li>
 
-<li>Tiny footprint: only about 1.5 mB overhead with all features included.</li>
+<li>Tiny footprint: only 1.75 mB overhead with all features included.</li>
 
 <li>All features are fully documented.</li>
 
@@ -253,8 +267,8 @@ Source: "MYPROG.EXE"; DestDir: "{app}"
 <link topic="runsection">[Run] section</link><br/>
 <link topic="uninstalldeletesection">[UninstallDelete] section</link><br/>
 <link topic="runsection">[UninstallRun] section</link><br/>
-<link topic="scriptintro">Pascal Scripting: Introduction</link>
-<link topic="compformshortcuts">Compiler IDE Keyboard Commands</link>
+<link topic="scriptintro">Pascal Scripting: Introduction</link><br/>
+<link topic="isppoverview">Inno Setup Preprocessor: Introduction</link>
 </p>
 
 </body>
@@ -3099,7 +3113,7 @@ Filename: "{win}\MYPROG.INI"; Section: "InstallSettings"; Key: "InstallPath"; St
 </precode>
 </li>
 
-<li>The Inno Setup backup domain can be found at <extlink href="https://www.innosetup.nl/">www.innosetup.nl</extlink>. There's currently no website active on this domain but in case of emergencies it will be activated.</li>
+<li>The Inno Setup backup domain can be found at <extlink href="https://innosetup.nl/">innosetup.nl</extlink>. It currently just redirects to the main site but in case of emergencies this will be deactivated.</li>
 
 </ul>
 
@@ -3108,114 +3122,295 @@ Filename: "{win}\MYPROG.INI"; Section: "InstallSettings"; Key: "InstallPath"; St
 
 
 
-<topic name="compformshortcuts" title="Compiler IDE Keyboard Commands">
-<keyword value="Compiler IDE Keyboard Commands" />
+<topic name="compformshortcuts" title="Compiler IDE Keyboard And Mouse Commands">
+<keyword value="Compiler IDE Keyboard And Mouse Commands" />
 <keyword value="Keyboard commands" />
+<keyword value="Mouse commands" />
 <body>
 
-<p>Besides the keyboard commands listed in the menus, the Compiler IDE supports the following additional keyboard commands:</p>
+<p>Besides the keyboard commands listed in the menus, the Compiler IDE supports additional keyboard and mouse commands, some of which depend on the active editor key map.</p>
+
+<p><u>If the Visual Studio Code column is empty then the shortcut for this command is the same as listed in the Classic column.</u></p>
+
+<p>A single dash (-) means there's no shortcut available for this command in the key map.</p>
+
+<p>Note: a few of the shortcuts below use string representations for special virtual keys. More precisely: ; for VK_OEM_1, . for VK_OEM_PERIOD, / for VK_OEM_2, [ for VK_OEM_4, \ for VK_OEM_5, and ] for VK_OEM_6. Different keyboard layouts usually reposition these special virtual keys or change the characters produced when they are pressed. In the <i>Edit</i> menu these shortcuts are shown using the current system's keyboard layout. For example, when using a French AZERTY keyboard layout the <i>Toggle Line Comment</i> shortcut is shown as Ctrl+: instead of Ctrl+/. If the keyboard layout doesn't support the virtual key then no shortcut will be shown.</p> 
 
 <table>
+<tr><td></td><td><u>Classic</u></td><td><u>Visual Studio Code</u></td></tr>
 <tr>
-  <td>Indent block.</td><td>Tab</td>
+  <td>&nbsp;</td>
 </tr>
 <tr>
-  <td>Unindent block.</td><td>Shift+Tab</td>
+  <td>Indent block</td><td>Tab</td>
 </tr>
 <tr>
-  <td>Delete to start of word.</td><td>Ctrl+Backspace</td>
+  <td>Unindent block</td><td>Shift+Tab</td>
 </tr>
 <tr>
-  <td>Delete to end of word.</td><td>Ctrl+Delete</td>
+  <td>Indent lines</td><td>-</td><td>Ctrl+]</td>
 </tr>
 <tr>
-  <td>Delete to start of line.</td><td>Ctrl+Shift+Backspace</td>
+  <td>Unindent lines</td><td>-</td><td>Ctrl+[</td>
 </tr>
 <tr>
-  <td>Delete to end of line.</td><td>Ctrl+Shift+Delete</td>
+  <td>Toggle lines comment</td><td>Ctrl+/</td>
 </tr>
 <tr>
-  <td>Go to start of document. Shift extends selection.</td><td>Ctrl+Home</td>
+  <td>&nbsp;</td>
 </tr>
 <tr>
-  <td>Go to start of line.</td><td>Alt+Home</td>
+  <td>Delete to start of word</td><td>Ctrl+Backspace</td>
 </tr>
 <tr>
-  <td>Go to end of document. Shift extends selection.</td><td>Ctrl+End</td>
+  <td>Delete to end of word</td><td>Ctrl+Delete</td>
 </tr>
 <tr>
-  <td>Go to end of line.</td><td>Alt+End</td>
+  <td>Delete to start of line</td><td>Ctrl+Shift+Backspace</td>
 </tr>
 <tr>
-  <td>Scroll up.</td><td>Ctrl+Up</td>
+  <td>Delete to end of line</td><td>Ctrl+Shift+Delete</td>
 </tr>
 <tr>
-  <td>Scroll down.</td><td>Ctrl+Down</td>
+  <td>&nbsp;</td>
 </tr>
 <tr>
-  <td>Cut line.</td><td>Ctrl+L</td>
+  <td>Go to start of document (Shift extends selection)</td><td>Ctrl+Home</td>
 </tr>
 <tr>
-  <td>Copy line.</td><td>Ctrl+Shift+T</td>
+  <td>Go to first non-blank character of line</td><td>Home</td>
 </tr>
 <tr>
-  <td>Delete line.</td><td>Ctrl+Shift+L</td>
+  <td>Go to start of line</td><td>Alt+Home or Home Home</td>
 </tr>
 <tr>
-  <td>Switch line with previous.</td><td>Ctrl+T</td>
+  <td>Go to end of document (Shift extends selection)</td><td>Ctrl+End</td>
 </tr>
 <tr>
-  <td>Duplicate selection or line.</td><td>Ctrl+D</td>
+  <td>Go to next paragraph (Shift extends selection)</td><td>Ctrl+]</td><td>-</td>
 </tr>
 <tr>
-  <td>Go to previous paragraph. Shift extends selection.</td><td>Ctrl+[</td>
+  <td>Go to previous paragraph (Shift extends selection)</td><td>Ctrl+[</td><td>-</td>
 </tr>
 <tr>
-  <td>Go to next paragraph. Shift extends selection.</td><td>Ctrl+]</td>
+  <td>Go to end of line</td><td>End</td>
 </tr>
 <tr>
-  <td>Go to previous word. Shift extends selection.</td><td>Ctrl+Left</td>
+  <td>Go to end of wrapped line</td><td>Alt+End</td>
 </tr>
 <tr>
-  <td>Go to next word. Shift extends selection.</td><td>Ctrl+Right</td>
+  <td>Go to previous word (Shift extends selection)</td><td>Ctrl+Left</td>
 </tr>
 <tr>
-  <td>Go to previous word part. Shift extends selection.</td><td>Ctrl+/</td>
+  <td>Go to next word (Shift extends selection)</td><td>Ctrl+Right</td>
 </tr>
 <tr>
-  <td>Go to next word part. Shift extends selection.</td><td>Ctrl+\</td>
+  <td>Go to matching brace</td><td>Ctrl+Shift+\</td>
 </tr>
 <tr>
-  <td>Extend selection.</td><td>Shift+Arrow</td>
+  <td>Scroll up</td><td>Ctrl+Up</td>
 </tr>
 <tr>
-  <td>Add additional selection.</td><td>Ctrl+Click or Ctrl+Drag</td>
+  <td>Scroll down</td><td>Ctrl+Down</td>
 </tr>
 <tr>
-  <td>Perform rectangular block selection.</td><td>Alt+Shift+Arrow or Alt+Drag</td>
+  <td>Scroll horizontally</td><td>Shift+MouseWheel</td>
 </tr>
 <tr>
-  <td>Extend rectangular selection to start of caret's line.</td><td>Alt+Shift+Home</td>
+  <td>&nbsp;</td>
 </tr>
 <tr>
-  <td>Extend rectangular selection to end of caret's line.</td><td>Alt+Shift+End</td>
+  <td>Cut selection or line</td><td>Ctrl+X or Shift+Delete</td>
 </tr>
 <tr>
-  <td>Revert multiple selections into a single one or a single selection into an empty one.</td><td>Esc</td>
+  <td>Copy selection or line</td><td>Ctrl+C or Ctrl+Insert</td>
 </tr>
 <tr>
-  <td>Complete word.</td><td>Ctrl+Space or Ctrl+I or Alt+Right (the last only if the Delphi key map is not active; all only if there's only a single selection)</td>
+  <td>Cut lines</td><td>Ctrl+L</td>
 </tr>
 <tr>
-  <td>Fillup complete word.</td><td>Tab or Enter or Space (for ISPP directives) or \ (for constants) or : (for constants and section parameters) or ] (for sections) or = (for section directives).</td>
+  <td>Copy lines</td><td>Ctrl+Shift+T</td>
 </tr>
 <tr>
-  <td>Cancel complete word.</td><td>Esc</td>
+  <td>Delete line</td><td>Ctrl+Shift+L</td><td>Ctrl+Shift+K</td>
 </tr>
 <tr>
-  <td>Switch between the active memo and the active bottom pane.</td><td>F6</td>
+  <td>Switch line with previous</td><td>Ctrl+T</td>
+</tr>
+<tr>
+  <td>Move selected lines up</td><td>Alt+Up</td>
+</tr>
+<tr>
+  <td>Move selected lines down</td><td>Alt+Down</td>
+</tr>
+<tr>
+  <td>Duplicate selection or copy lines down</td><td>Ctrl+D</td><td>-</td>
+</tr>
+<tr>
+  <td>Copy line down</td><td>-</td><td>Shift+Alt+Down</td>
+</tr>
+<tr>
+  <td>Lowercase lines</td><td>Ctrl+U</td>
+</tr>
+<tr>
+  <td>Uppercase lines</td><td>Ctrl+Shift+U</td>
+</tr>
+<tr>
+  <td>&nbsp;</td>
+</tr>
+<tr>
+  <td>Extend selection</td><td>Shift+Arrow</td>
+</tr>
+<tr>
+  <td>Select word</td><td>DoubleClick</td>
+</tr>
+<tr>
+  <td>Select line</td><td>TripleClick or Click on line number</td>
+</tr>
+<tr>
+  <td>Select all</td><td>Ctrl+A or Ctrl+Click on line number</td>
+</tr>
+<tr>
+  <td>Add additional cursor or selection</td><td>Ctrl+Click or Ctrl+Drag</td><td>Alt+Click or Alt+Drag</td>
+</tr>
+<tr>
+  <td>Remove a selection by clicking it</td><td>Ctrl+Click</td><td>Alt+Click</td>
+</tr>
+<tr>
+  <td>Add word as additional selection</td><td>Ctrl+DoubleClick</td><td>Alt+DoubleClick</td>
+</tr>
+<tr>
+  <td>Add line as additional selection</td><td>Ctrl+TripleClick</td><td>Alt+TripleClick</td>
+</tr>
+<tr>
+  <td>Add additional cursor or selection up</td><td>Ctrl+Alt+Up</td>
+</tr>
+<tr>
+  <td>Add additional cursor or selection down</td><td>Ctrl+Alt+Down</td>
+</tr>
+<tr>
+  <td>Add cursors to line ends</td><td>Shift+Alt+I</td>
+</tr>
+<tr>
+  <td>&nbsp;</td>
+</tr>
+<tr>
+  <td>Add next occurrence of current word or selected text as additional selection</td><td>Shift+Alt+.</td><td>Ctrl+D</td>
+</tr>
+<tr>
+  <td>Select all occurrences of current word or selected text</td><td>Shift+Alt+;</td><td>Ctrl+Shift+L or (only if classic menu keys are not active) Ctrl+F2</td>
+</tr>
+<tr>
+  <td>Select all matches of last find text (also works when find dialog is open)</td><td>Alt+Enter</td>
+</tr>
+<tr>
+  <td>Revert multiple selections into single one or single selection into empty one</td><td>Esc</td>
+</tr>
+<tr>
+  <td>&nbsp;</td>
+</tr>
+<tr>
+  <td>Perform rectangular block selection (mouse) (Shift extends selection)</td><td>Alt+Drag</td><td>Shift+Alt+Drag</td>
+</tr>
+<tr>
+  <td>Perform rectangular block selection (keyboard)</td><td>Shift+Alt+Arrow</td><td>Ctrl+Shift+Alt+Arrow</td>
+</tr>
+<tr>
+  <td>Extend rectangular selection to first non-blank character of line</td><td>Shift+Alt+Home</td><td>Ctrl+Shift+Alt+Home</td>
+</tr>
+<tr>
+  <td>Extend rectangular selection to start of line</td><td>Shift+Alt+Home Home</td><td>Ctrl+Shift+Alt+Home Home</td>
+</tr>
+<tr>
+  <td>Extend rectangular selection to end of line</td><td>Shift+Alt+End</td><td>Ctrl+Shift+Alt+End</td>
+</tr>
+<tr>
+  <td>&nbsp;</td>
+</tr>
+<tr>
+  <td>Fold section</td><td>Ctrl+Shift+[</td>
+</tr>
+<tr>
+  <td>Unfold section</td><td>Ctrl+Shift+]</td>
+</tr>
+<tr>
+  <td>Fold or unfold all sections</td><td>Ctrl+Shift+Click in folding margin</td>
+</tr>
+<tr>
+  <td>&nbsp;</td>
+</tr>
+<tr>
+  <td>Invoke autocomplete</td><td>Ctrl+Space or Ctrl+I</td>
+</tr>
+<tr>
+  <td>Select autocompletion</td><td>Tab or Enter</td>
+</tr>
+<tr>
+  <td>Fillup autocompletion</td><td>Space for ISPP directives and Flags and Type parameters<br />\ for constants<br />: for constants and section parameters<br />] for sections<br />= for section directives<br />( for [Code]</td>
+</tr>
+<tr>
+  <td>Invoke parameter hint or show next definition</td><td>Ctrl+Shift+Space</td>
+</tr>
+<tr>
+  <td>Cancel autocomplete or parameter hint</td><td>Esc</td>
+</tr>
+<tr>
+  <td>&nbsp;</td>
+</tr>
+<tr>
+  <td>Toggle overwrite</td><td>Insert</td>
+</tr>
+<tr>
+  <td>Select tab</td><td>Ctrl+1 through Ctrl+9</td>
+</tr>
+<tr>
+  <td>Switch between the active memo and the active bottom pane</td><td>F6</td>
 </tr>
 </table>
+
+</body>
+</topic>
+
+
+
+<topic name="compformregex" title="Compiler IDE Regular Expressions">
+<keyword value="Compiler IDE Regular Expressions" />
+<keyword value="Regular Expressions" />
+<keyword value="Regex" />
+<body>
+
+<p>The Compiler IDE supports to use of regular expressions for all of its find and replace operations. This can be enabled and disabled using the <i>Use Regular Expressions</i> option to the <i>Edit</i> menu or its shortcut (Alt+R). Once enabled or disabled, this setting will be preserved across sessions.</p>
+
+<p>When used, regular expressions will only match ranges within a single line, never matching over multiple lines.</p>
+
+<p>Regular expressions must be written in the ECMAScript grammar, generally similar to the grammar used by JavaScript and the .NET languages. Invalid regular expressions will cause an error message.</p>
+
+<p>For more information about the grammar see:</p>
+<ul>
+<li><extlink href="https://cplusplus.com/reference/regex/ECMAScript/">https://cplusplus.com/reference/regex/ECMAScript/</extlink></li>
+<li><extlink href="https://learn.microsoft.com/en-us/cpp/standard-library/regular-expressions-cpp">https://learn.microsoft.com/en-us/cpp/standard-library/regular-expressions-cpp</extlink></li>
+<li><extlink href="https://regex101.com/r/fYE7S3/1">https://regex101.com/r/fYE7S3/1</extlink></li>
+</ul>
+
+<p>When replacing using regular expressions the replace string may contain the following special escape sequences:</p>
+
+<table>
+<tr><td><u>Escape Sequence</u></td><td><u>Meaning</u></td></tr>
+<tr>
+  <td>$1 through $9 or \1 through \9</td><td>Contents of the corresponding capture group</td>
+</tr>
+<tr>
+  <td>$&amp; or \0</td><td>Complete match contents</td>
+</tr>
+<tr>
+  <td>$$</td><td>A literal '$' character</td>
+</tr>
+<tr>
+  <td>\\, \a, \b, \f, \r, \n, \t, \v</td><td>A literal '\', '\a', '\b', etc. character</td>
+</tr>
+</table>
+
+<p>For example, if the search string was (Ex)(ample) and the replace string was $2$1, when applied to a script saying "Examples" this would modify the script to say "ampleExs". Or if the replace string was $1\r\n$2 this would put a newline between "Ex" and "amples".</p>
 
 </body>
 </topic>
@@ -3243,11 +3438,21 @@ Filename: "{win}\MYPROG.INI"; Section: "InstallSettings"; Key: "InstallPath"; St
 
 <p>As shown in the example above, filenames that include spaces must be enclosed in quotes.</p>
 
-<p>Valid options are: "/O-" to disable output (overriding any <tt>Output</tt> setting in the script), "/O+" to enable output (overriding any <tt>Output</tt> setting in the script), "/O" to specify an output path (overriding any <tt>OutputDir</tt> setting in the script), "/F" to specify an output filename (overriding any <tt>OutputBaseFilename</tt> setting in the script), "/S" to specify a Sign Tool (any Sign Tools configured using the Compiler IDE will be specified automatically), "/Q[p]" for quiet compile (print only error messages, "p" will show progress info), and "/?" to show a help screen.</p>
+<p>Valid options are:</p>
 
 <indent>
+<table>
+<tr><td>/O(+|-)</td><td>Enable or disable output (overrides <tt>Output</tt>)</td></tr>
+<tr><td>/O&lt;path&gt;</td><td>Output files to specified path (overrides <tt>OutputDir</tt>)</td></tr>
+<tr><td>/F&lt;filename&gt;</td><td>Specifies an output filename (overrides <tt>OutputBaseFilename</tt>)</td></tr>
+<tr><td>/S&lt;name&gt;=&lt;command></td><td>Sets a SignTool with the specified name and command (any Sign Tools configured using the Compiler IDE will be specified automatically)</td></tr>
+<tr><td>/Q</td><td>Quiet compile (print error messages only)</td></tr>
+<tr><td>/Qp</td><td>Enable quiet compile while still displaying progress</td></tr>
+</table>
 <example>iscc /Qp /O"My Output" /F"MyProgram-1.0" /Sbyparam=$p "c:\isetup\samples\my script.iss"</example>
 </indent>
+
+<p>Also see <link topic="isppcc">Inno Setup Preprocessor: Command Line Compiler</link> for additional options.</p>
 
 <p>ISCC will return an exit code of 0 if the compile was successful, 1 if the command line parameters were invalid or an internal error occurred, or 2 if the compile failed.</p>
 </li>
@@ -4236,19 +4441,20 @@ Name: portablemode; Description: "Portable Mode"</pre></example>
 <p><tt>lzma</tt> is the method of compression employed by the <extlink href="http://www.7-zip.org/">7-Zip LZMA</extlink> compressor. It typically compresses significantly better than the <tt>zip</tt> and <tt>bzip</tt> methods. However, depending on the compression level used, it can be significantly slower at compressing, and consume a <i>lot</i> more memory. The following table summarizes the approximate memory requirements for each of the supported <tt>lzma</tt> compression levels. If a compression level isn't specified, it defaults to <tt>max</tt>.</p>
 <indent>
 <table>
-<tr><td></td><td><u>Decompression (dictionary size)</u></td><td><u>Compression (4 MB + 11 * dictionary size)</u></td></tr>
-<tr><td><tt>fast</tt> (worst)</td><td>32 KB</td><td>3 MB</td></tr>
-<tr><td><tt>normal</tt></td><td>2 MB</td><td>26 MB</td></tr>
-<tr><td><tt>max</tt> (default)</td><td>8 MB</td><td>92 MB</td></tr>
-<tr><td><tt>ultra</tt></td><td>32 MB</td><td>356 MB</td></tr>
-<tr><td><tt>ultra64</tt> (best)</td><td>64 MB</td><td>708 MB</td></tr>
-<tr><td></td><td>128 MB</td><td>1.38 GB</td></tr>
-<tr><td></td><td>256 MB</td><td>2.75 GB</td></tr>
-<tr><td></td><td>512 MB</td><td>5.5 GB</td></tr>
-<tr><td></td><td>1 GB</td><td>11 GB</td></tr>
+<tr><td></td><td><u>Decompression (dictionary size)</u></td><td><u>Compression (6 MB + 11.5 * dictionary size)</u></td></tr>
+<tr><td><tt>fast</tt> (worst)</td><td>32 KB</td><td>6 MB</td></tr>
+<tr><td><tt>normal</tt></td><td>2 MB</td><td>29 MB</td></tr>
+<tr><td><tt>max</tt> (default)</td><td>8 MB</td><td>98 MB</td></tr>
+<tr><td><tt>ultra</tt></td><td>32 MB</td><td>374 MB</td></tr>
+<tr><td><tt>ultra64</tt> (best)</td><td>64 MB</td><td>742 MB</td></tr>
+<tr><td></td><td>128 MB</td><td>1.44 GB</td></tr>
+<tr><td></td><td>256 MB</td><td>2.88 GB</td></tr>
+<tr><td></td><td>512 MB</td><td>5.76 GB</td></tr>
+<tr><td></td><td>1 GB</td><td>11.51 GB</td></tr>
 </table>
+<p>The compression memory requirements are approximately 60% of the above when <link topic="setup_lzmamatchfinder">LZMAMatchFinder</link> is set to <tt>HC</tt> at the expense of compression ratio.</p>
 </indent>
-<p><tt>lzma2</tt> is the method of compression employed by the <extlink href="http://www.7-zip.org/">7-Zip LZMA2</extlink> compressor. LZMA2 is a modified version of LZMA that offers a better compression ratio for incompressible data (random data expands about 0.005%, compared to 1.35% with original LZMA), and optionally can compress multiple parts of large files in parallel, greatly increasing compression speed but with a possible reduction in compression ratio (see <link topic="setup_lzmanumblockthreads">LZMANumBlockThreads</link>). Like LZMA, it can consume a <i>lot</i> of memory; see the above table. If a compression level isn't specified, it defaults to <tt>max</tt>.</p>
+<p><tt>lzma2</tt> is the method of compression employed by the <extlink href="http://www.7-zip.org/">7-Zip LZMA2</extlink> compressor. LZMA2 is a modified version of LZMA that offers a better compression ratio for incompressible data (random data expands about 0.005%, compared to 1.35% with original LZMA), and optionally can compress multiple parts of large files in parallel, greatly increasing compression speed but with a possible reduction in compression ratio (see <link topic="setup_lzmanumblockthreads">LZMANumBlockThreads</link>). If a compression level isn't specified, it defaults to <tt>max</tt>. Like LZMA, LZMA2 can consume a <i>lot</i> of memory; see the above table. Do note: LZMA2 only supports a limited number of dictionary sizes and other sizes will be rounded up to the next supported size. Supported sizes are powers of two starting at 4 (4, 8, 16, 32, etc., up to 1048576) and the midway points between them (6, 12, 24, etc., up to 786432). For instance, a dictionary size of 524289 (512 MB + 1 byte) has the same memory requirements as one of 786432 (768 MB).</p>
 <p><tt>none</tt> specifies that no compression be used.</p>
 <p><b>See also:</b><br/>
 <link topic="setup_solidcompression">SolidCompression</link><br/>
@@ -4824,7 +5030,7 @@ DiskSliceSize=1457664
 <body>
 <p>Specifies a password you want to prompt the user for at the beginning of the installation.</p>
 <p>When using a password, you might consider setting <link topic="setup_encryption">Encryption</link> to <tt>yes</tt> as well, otherwise files will be stored as plain text and it would not be exceedingly difficult for someone to gain access to them through reverse engineering.</p>
-<p>The password itself is not stored as clear text; it's stored as a 160-bit SHA-1 hash, salted with a 64-bit random number. (Note: When encryption is enabled, this stored hash is <i>not</i> used for the encryption key; a different hash with a different salt is generated for that.)</p>
+<p>The password itself is not stored (neither as clear text nor as a hash) but you should still use a strong password.</p>
 </body>
 </setuptopic>
 
@@ -5231,10 +5437,23 @@ DiskSliceSize=1457664
 <setupvalid><link topic="yesnonotes"><tt>yes</tt> or <tt>no</tt></link></setupvalid>
 <setupdefault><tt>no</tt></setupdefault>
 <body>
-<p>If set to <tt>yes</tt>, files that are compiled into the installation (via [Files] section entries) will be encrypted using ARCFOUR encryption, with a 160-bit key derived from the value of the <link topic="setup_password">Password</link> [Setup] section directive.</p>
-<p>Because of encryption import/export laws in some countries, encryption support is not included in the main Inno Setup installer but downloaded by it instead. See the <extlink href="https://jrsoftware.org/isdl.php">Inno Setup Downloads</extlink> page for more information.</p>
+<p>If set to <tt>yes</tt>, files that are compiled into the installation (via [Files] section entries) will be encrypted using XChaCha20 encryption.</p>
 <p>If encryption is enabled and you call the <link topic="isxfunc_ExtractTemporaryFile">ExtractTemporaryFile</link> function from the [Code] section prior to the user entering the correct password, the function will fail unless the <tt>noencryption</tt> flag is used on the [Files] section entry for the file.</p>
-<p>The key used for encryption is a 160-bit SHA-1 hash of 64-bit random salt plus the value of <link topic="setup_password">Password</link>.</p>
+<p>The 256-bit XChaCha20 encryption key is derived from the value of <link topic="setup_password">Password</link> using the function specified by <link topic="setup_encryptionkeyderivation">EncryptionKeyDerivation</link>, and the 192-bit XChaCha20 encryption nonce is a random base nonce, appending the index of the first file in the chunk for unique encryption nonces.</p>
+</body>
+</setuptopic>
+
+<setuptopic directive="EncryptionKeyDerivation">
+<keyword value="pbkdf2" />
+<setupvalid><tt>pbkdf2</tt><br/>
+<tt>pbkdf2/1</tt> through <tt>pbkdf2/2147483647</tt></setupvalid>
+<setupdefault><tt>pbkdf2/200000</tt></setupdefault>
+<body>
+<p>This specifies the key derivation function to use to derive the encryption key from the value of <link topic="setup_password">Password</link>, and optionally its parameters.</p>
+<p><tt>pbkdf2</tt> is the PBKDF2-HMAC-SHA256 function with a 128-bit random salt, and optionally allows to increase its number of iterations for extra security. If the number of iterations isn't specified, it defaults to 200000.</p>
+<p><b>See also:</b><br/>
+<link topic="setup_encryption">Encryption</link>
+</p>
 </body>
 </setuptopic>
 
@@ -5389,7 +5608,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 <setupvalid><link topic="yesnonotes"><tt>yes</tt> or <tt>no</tt></link></setupvalid>
 <setupdefault><tt>yes</tt></setupdefault>
 <body>
-<p>Specifies whether the compiler should set the "Terminal Services aware" flag in the headers of the Setup and Uninstall programs. This feature is new to version 5.1.7 and defaults to <tt>yes</tt>; previous versions never set the flag.</p>
+<p>Specifies whether the compiler should set the "Terminal Services aware" flag in the headers of the Setup and Uninstall programs.</p>
 <p>Most importantly, the "Terminal Services aware" flag affects the behavior of the {win} constant (and <link topic="isxfunc_GetWinDir">GetWinDir</link> support function) on servers with Terminal Services installed in application mode.</p>
 <p>When the flag is set, {win} will consistently return the system's real Windows directory, typically "C:\WINDOWS", just as on systems that do not have Terminal Services installed.</p>
 <p>When the flag is not set, Windows runs the program in compatibility mode, where {win} may return either the real Windows directory or a user-specific Windows directory, such as "C:\Documents and Settings\&lt;user name&gt;\WINDOWS". Which one you get depends on the name of the program's EXE file and how it is launched. If the program is named setup.exe or install.exe, or if it is launched from the <i>Add/Remove Programs</i> Control Panel applet, then Windows will put the system in "install mode", which effectively makes the program (and all other programs running in the session) behave as if the "Terminal Services aware" flag were set. Otherwise, the program is treated as a legacy application and is given a private Windows directory. (This is true even if the user running the program has full administrative privileges.)</p>
@@ -5401,7 +5620,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 <setupvalid><link topic="yesnonotes"><tt>yes</tt> or <tt>no</tt></link></setupvalid>
 <setupdefault><tt>yes</tt></setupdefault>
 <body>
-<p>Specifies whether the compiler should set the "NX Compatible" flag in the headers of the Setup and Uninstall programs to mark them compatible with data execution prevention (DEP). This feature is new to version 5.5.7 and defaults to <tt>yes</tt>; previous versions never set the flag.</p>
+<p>Specifies whether the compiler should set the "NX Compatible" flag in the headers of the Setup and Uninstall programs to mark them compatible with data execution prevention (DEP).</p>
 <p>Setting this to <tt>no</tt> might be needed if you're using a buggy third-party DLL from [Code].</p>
 </body>
 </setuptopic>
@@ -5410,7 +5629,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 <setupvalid><link topic="yesnonotes"><tt>yes</tt> or <tt>no</tt></link></setupvalid>
 <setupdefault><tt>yes</tt></setupdefault>
 <body>
-<p>Specifies whether the compiler should set the "Dynamic Base" flag in the headers of the Setup and Uninstall programs. This feature is new to version 5.5.7 and defaults to <tt>yes</tt>; previous versions never set the flag.</p>
+<p>Specifies whether the compiler should set the "Dynamic Base" flag in the headers of the Setup and Uninstall programs.</p>
 </body>
 </setuptopic>
 
@@ -5609,7 +5828,7 @@ SignTool=byparam format c:
 <tt>BT</tt> otherwise</setupdefault>
 <body>
 <p>Controls the match finder method used by the LZMA and LZMA2 compressors.</p>
-<p>A value of <tt>HC</tt> enables the Hash Chain method with 4 hash bytes.</p>
+<p>A value of <tt>HC</tt> enables the Hash Chain method with 5 hash bytes.</p>
 <p>A value of <tt>BT</tt> enables the Binary Tree method with 4 hash bytes.</p>
 <p>The Binary Tree method can provide a better compression ratio at the expense of compression speed.</p>
 </body>
